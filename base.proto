@@ -1,0 +1,29 @@
+package base;
+
+// generic message types
+message String
+{
+    required string val = 1;
+}
+
+message UInt32
+{
+    required uint32 val = 1;
+}
+
+message Bool
+{
+    required bool val = 1;
+}
+
+message Float
+{
+    required float val = 1;
+}
+
+message Double
+{
+    required double val = 1;
+}
+
+// vim: set ts=4 sw=4:
