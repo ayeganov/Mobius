@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Contenty-Type" content="text/html"; charset=UTF-8"/>
+        <title>Upload form</title>
+        <script src="static/js/dojo/dojo.js"; data-dojo-config="async: true"></script>
+    </head>
+    <body>
+        <p><h1>Select & Upload</h1></p>
+        <form enctype="multipart/form-data" action="/upload" method="post">
+            File: <input type="file" name="fileID" />
+            Name: <input type="text" name="userID" />
+            <br />
+            <br />
+            <input type="submit" value="upload" />
+        </form> 
+
+        <span id="gitHubData"></span>
+        <h1 id="source">Dojo can interrogate the DOM</h1>
+        <h2 id="dest"></h2>
+
+        <script>
+            require(["dojo/dom"], function(dom) {
+                dom.byId("dest").innerText = dom.byId("source").innerText;
+            });
+
+            require(["dojo/dom", "dojo/request"], function(dom, request){
+                request.get("https://api.github.com/users/ayeganov").then(function(data) {
+                    dom.byId("gitHubData").innerText = data;
+                });
+            });
+        </script>
+    </body>
+</html>
