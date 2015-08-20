@@ -263,9 +263,9 @@ class StreamHandler(PostContentHandler):
         '''
         if self._cur_headers != headers:
             self._cur_headers = headers
-            try:
-                # Process different content types differently
-                if self._cur_headers[self.CONTENT_KEY]['value'] == self.FILE_CONTENT_TYPE:
-                    self._write_file_data(self._cur_headers, chunk)
-            except KeyError:
-                self._process_form_field(self._cur_headers, chunk)
+        try:
+            # Process different content types differently
+            if self._cur_headers[self.CONTENT_KEY]['value'] == self.FILE_CONTENT_TYPE:
+                self._write_file_data(self._cur_headers, chunk)
+        except KeyError:
+            self._process_form_field(self._cur_headers, chunk)

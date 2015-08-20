@@ -2,6 +2,7 @@ import asyncio
 import os
 import traceback
 
+from tornado.httpserver import HTTPServer
 from tornado.platform.asyncio import AsyncIOMainLoop
 from tornado.web import RequestHandler, Application, StaticFileHandler
 
@@ -12,6 +13,7 @@ AsyncIOMainLoop().install()
 
 # TODO: Fix this by creating a util module
 TMP_DIR = "/run/shm/"
+MAX_BUFFER = 1024**3
 
 
 class MainHandler(RequestHandler):
@@ -44,7 +46,9 @@ def main():
             debug=True
         )
 
-        app.listen(8888)
+        server = HTTPServer(app, max_body_size=MAX_BUFFER)
+
+        server.listen(8888)
         loop = asyncio.get_event_loop()
         print("Started mobius server.")
         loop.run_forever()
