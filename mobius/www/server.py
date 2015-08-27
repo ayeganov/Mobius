@@ -1,13 +1,17 @@
+# Standard lib
 import asyncio
 import os
 import traceback
 
 from tornado.httpserver import HTTPServer
+
+# 3rd party
 from tornado.platform.asyncio import AsyncIOMainLoop
-from tornado.web import RequestHandler, Application, StaticFileHandler
+from tornado.web import (RequestHandler,
+                         Application,
+                         StaticFileHandler)
 
-import utils
-
+from handlers import upload
 
 AsyncIOMainLoop().install()
 
@@ -36,7 +40,7 @@ def main():
                 (r'/(favicon.ico)', StaticFileHandler, {"path": ""}),
 
                 # File upload handler
-                (r'/upload', utils.StreamHandler, {"tmp_dir": TMP_DIR}),
+                (r'/upload', upload.StreamHandler, {"tmp_dir": TMP_DIR}),
 
                 # Page handlers
                 (r"/", MainHandler),
