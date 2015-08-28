@@ -3,7 +3,7 @@ import os
 COMM_DIR = "COMM_DIR"
 
 
-def get_comm_dir():
+def get_zmq_dir():
     '''
     Return the folder which contains the communication sockets.
     '''

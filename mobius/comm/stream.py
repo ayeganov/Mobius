@@ -1,7 +1,16 @@
+import os
+
 import zmq
 
 from mobius.comm import builder
-from mobius.utils import Singleton
+from mobius.utils import Singleton, get_zmq_dir
+
+
+IPC = "ipc"
+INPROC = "inproc"
+TCP = "tcp"
+PGM = "pgm"
+EPGM = "epgm"
 
 
 class StreamError(Exception):
@@ -73,7 +82,7 @@ class ZmqAddress:
     Represents a ZMQ address path - abstracts away the transports being used in
     socket creation.
     '''
-    def __init__(self, transport="ipc", host=None, topic=None, port=None):
+    def __init__(self, transport=IPC, host=None, topic=None, port=None):
         '''
         @param transport - one of "IPC", "INPROC", "TCP"
         @param host - ip address, or hostname of server to connect to
@@ -86,9 +95,9 @@ class ZmqAddress:
         self._topic = topic
         self._port = port
 
-        self._is_ipc = self._transport in ("ipc", "inproc")
-        self._is_tcp = self._transport == "tcp"
-        self._is_pgm = self._transport in ("pgm", "epgm")
+        self._is_ipc = self._transport in (IPC, INPROC)
+        self._is_tcp = self._transport == TCP
+        self._is_pgm = self._transport in (PGM, EPGM)
 
         if self._is_pgm:
             raise Stream("Pragmatic general multicast not supported.")
@@ -108,7 +117,8 @@ class ZmqAddress:
         '''
         if self._is_ipc:
             name = self._topic.lstrip('/').replace('/', '_')
-            return "{0}://{1}".format(self._transport, name)
+            full_name = os.path.join(get_zmq_dir(), name)
+            return "{0}://{1}".format(self._transport, full_name)
         if self._is_tcp:
             return "{0}://{1}:{2}".format(self._transport, self._host, self._port)
 
@@ -125,17 +135,18 @@ class Stream:
     This is the main class that interacts with the zmq library to send, and
     receive messages.
     '''
-    def __init__(self, name, path, send_type, resp_type=None):
+    def __init__(self, name, path, stream_info, loop=None):
         '''
         Initializes instance of Stream.
 
         @param name - name of this channel
         @param path - path to the socket on the disk
-        @param send_type - type of message that can be sent over this stream
-        @param resp_type - optional type of message expected in response to
-                           sent message.(useful when dealing with REQ/REP
-                           socket types.)
+        @param stream_info - this streams definition from the yaml config
+        @param loop - loop this socket will belong to. Default is global async loop.
         '''
+        self._name = name
+        self._path = path
+        self._loop = loop
 
 
 class SocketFactory:
@@ -143,7 +154,7 @@ class SocketFactory:
     Convenience class for creating different types of zmq sockets.
     '''
     @staticmethod
-    def pub_socket(topic=None, on_send=None, host=None, transport="ipc", port=None, loop=None):
+    def pub_socket(topic=None, on_send=None, host=None, transport=IPC, port=None, loop=None):
         '''
         Create a publish socket on the specified topic.
 
@@ -154,7 +165,7 @@ class SocketFactory:
                          number of bytes sent, or -1 indicating an error.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
-        @param loop - loop this socket will belong to. Default is global async loop.
+        @param loop - loop this socket will belong to.
         @param port - port number to connect to
         @returns AIOZMQSocket
         '''
@@ -164,16 +175,19 @@ class SocketFactory:
         socket = context.socket(zmq.PUB)
         zmq_address = ZmqAddress(transport=transport, host=host, topic=topic, port=port)
 
-        print(zmq_address)
         socket.bind(zmq_address.address_string)
 
-        async_sock = AIOZMQSocket(socket, loop=loop)
-        async_sock.on_send(on_send)
+        stream_info = StreamMap().get_channel_info(topic)
+        if not stream_info:
+            raise StreamError("Channel '{0}' doesn't exist.".format(topic))
 
-        return async_sock
+        stream_sock = Stream(topic, zmq_address.address_string, stream_info, loop=loop)
+        stream_sock.on_send(on_send)
+
+        return stream_sock
 
     @staticmethod
-    def sub_socket(topic=None, on_recv=None, host=None, transport="ipc", port=None, loop=None):
+    def sub_socket(topic=None, on_recv=None, host=None, transport=IPC, port=None, loop=None):
         '''
         Create a subscriber socket on the specified topic.
 
@@ -196,14 +210,13 @@ class SocketFactory:
         zmq_address = ZmqAddress(transport=transport, host=host, topic=topic, port=port)
         socket.connect(zmq_address.address_string)
 
-        print(zmq_address)
         async_sock = AIOZMQSocket(socket, loop=loop)
         async_sock.on_recv(on_recv)
 
         return async_sock
 
     @staticmethod
-    def req_socket(topic=None, on_send=None, on_recv=None, host=None, transport="ipc", port=None, loop=None):
+    def req_socket(topic=None, on_send=None, on_recv=None, host=None, transport=IPC, port=None, loop=None):
         '''
         Create a subscriber socket on the specified topic.
 
@@ -236,7 +249,7 @@ class SocketFactory:
         return async_sock
 
     @staticmethod
-    def rep_socket(topic=None, on_send=None, on_recv=None, host=None, transport="ipc", port=None, loop=None):
+    def rep_socket(topic=None, on_send=None, on_recv=None, host=None, transport=IPC, port=None, loop=None):
         '''
         Create a subscriber socket on the specified topic.
 
