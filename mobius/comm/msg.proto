@@ -1,6 +1,6 @@
 package base;
 
-// generic message types
+// Generic message types. Use these if you only need to send a single value.
 message String
 {
     required string val = 1;
@@ -24,6 +24,12 @@ message Float
 message Double
 {
     required double val = 1;
+}
+
+// Mobius model files
+message UploadFile
+{
+    required string path = 1;
 }
 
 // vim: set ts=4 sw=4:
