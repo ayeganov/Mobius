@@ -46,6 +46,8 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
         self._receiving_data = False
         self.header_list = []
         self._buffer = b""
+        self._count = 0
+        self._total = 1
 
     @tornado.gen.coroutine
     def _extract_boundary(self, cont_buf):
@@ -169,6 +171,7 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
 
         @param chunk - a piece of content body.
         '''
+        self._count += len(chunk)
         self._buffer += chunk
         # Has boundary been established?
         if not self._boundary:
@@ -189,6 +192,21 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
                 if headers:
                     self.header_list.append(headers)
                     self._receiving_data = True
+                else:
+                    break
+
+    def prepare(self):
+        '''
+        Prepares this request by getting the content length of the upload.
+        '''
+        self._total = int(self.request.headers['Content-Length'])
+
+    @property
+    def progress(self):
+        '''
+        Provide current progress of the upload in the form of an integer.
+        '''
+        return (self._count * 100) // self._total
 
     @abc.abstractmethod
     def receive_data(self):
