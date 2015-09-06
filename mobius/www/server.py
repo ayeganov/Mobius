@@ -1,19 +1,17 @@
 # Standard lib
-import asyncio
 import os
 import traceback
 
-from tornado.httpserver import HTTPServer
 
 # 3rd party
-from tornado.platform.asyncio import AsyncIOMainLoop
+from tornado import ioloop
+from tornado.httpserver import HTTPServer
 from tornado.web import (RequestHandler,
                          Application,
                          StaticFileHandler)
 
-from handlers import upload
-
-AsyncIOMainLoop().install()
+from mobius.www.handlers import upload
+from mobius.comm.stream import SocketFactory
 
 # TODO: Fix this by creating a util module
 TMP_DIR = "/run/shm/"
@@ -34,13 +32,14 @@ def main():
     Main routine, what more do you want?
     '''
     try:
+        upload_pub = SocketFactory.pub_socket("/upload/ready/")
         app = Application(
             [
                 # Static file handlers
                 (r'/(favicon.ico)', StaticFileHandler, {"path": ""}),
 
                 # File upload handler
-                (r'/upload', upload.StreamHandler, {"tmp_dir": TMP_DIR}),
+                (r'/upload', upload.StreamHandler, {"tmp_dir": TMP_DIR, "upload_pub": upload_pub}),
 
                 # Page handlers
                 (r"/", MainHandler),
@@ -53,9 +52,9 @@ def main():
         server = HTTPServer(app, max_body_size=MAX_BUFFER)
 
         server.listen(8888)
-        loop = asyncio.get_event_loop()
+        loop = ioloop.IOLoop.instance()
         print("Started mobius server.")
-        loop.run_forever()
+        loop.start()
     except (SystemExit, KeyboardInterrupt):
         print("Exiting due to interrupt...")
     except Exception:
