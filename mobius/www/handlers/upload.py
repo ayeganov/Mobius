@@ -1,7 +1,8 @@
 import tempfile
 
 # Mobius
-from utils import PostContentHandler
+from mobius.www.utils import PostContentHandler
+from mobius.comm.msg_pb2 import UploadFile
 
 
 class StreamHandler(PostContentHandler):
@@ -10,11 +11,11 @@ class StreamHandler(PostContentHandler):
     the client, and stores the downloaded files in the provided temporary
     directory.
     '''
-    FILE_CONTENT_TYPE = "application/octet-stream"
-    CONTENT_KEY = "Content-Type"
+    DISPOSITION = "Content-Disposition"
+    FILE_FIELD = "fileID"
     POST_SUCCESS = 201
 
-    def initialize(self, tmp_dir):
+    def initialize(self, tmp_dir, upload_pub):
         '''
         The initialization method for this request handler.
 
@@ -22,7 +23,9 @@ class StreamHandler(PostContentHandler):
         '''
         super(StreamHandler, self).initialize()
         self._tmp_file = tempfile.NamedTemporaryFile(dir=tmp_dir, delete=False)
+        self._upload_pub = upload_pub
         self._cur_headers = None
+        self._file_started = False
 
     def on_finish(self):
         '''
@@ -56,6 +59,18 @@ class StreamHandler(PostContentHandler):
         @param data - data entered into the field.
         '''
 
+    def _get_field_name(self, headers):
+        '''
+        Retrieve the name of the field from the given headers.
+
+        @param headers - HTTP headers
+        @returns name of the field specified on the page
+        '''
+        try:
+            return headers[self.DISPOSITION]["params"]["name"]
+        except KeyError:
+            return None
+
     def receive_data(self, headers, chunk):
         '''
         Receive part of the data being sent by the client.
@@ -64,9 +79,13 @@ class StreamHandler(PostContentHandler):
         '''
         if self._cur_headers != headers:
             self._cur_headers = headers
-            try:
-                # Process different content types differently
-                if self._cur_headers[self.CONTENT_KEY]['value'] == self.FILE_CONTENT_TYPE:
-                    self._write_file_data(self._cur_headers, chunk)
-            except KeyError:
-                self._process_form_field(self._cur_headers, chunk)
+            if self._file_started:
+                # Changing header, and file has already been started - file was downloaded
+                self._upload_pub.send(UploadFile(path=self._tmp_file.name))
+            self._file_started = self._get_field_name(self._cur_headers) == self.FILE_FIELD
+        try:
+            # Process different content types differently
+            if self._file_started:
+                self._write_file_data(self._cur_headers, chunk)
+        except KeyError:
+            self._process_form_field(self._cur_headers, chunk)
