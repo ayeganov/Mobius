@@ -180,6 +180,10 @@ class Stream:
             msg = msg_type()
             try:
                 msg.ParseFromString(d)
+            except TypeError:
+                # We are dealing with the envelope frames, simply add them to
+                # the message list
+                msg = d
             except Exception as e:
                 log.error("Unable to parse protocol message of type {0}".format(msg_type))
                 log.exception(e)
@@ -207,7 +211,7 @@ class SocketFactory:
     Convenience class for creating different types of zmq sockets.
     '''
     @staticmethod
-    def pub_socket(chan_name, on_send=None, host=None, transport=IPC, port=None, loop=None):
+    def pub_socket(chan_name, on_send=None, host=None, transport=IPC, port=None, bind=True, loop=None):
         '''
         Create a publish socket on the specified chan_name.
 
@@ -218,15 +222,19 @@ class SocketFactory:
                          number of bytes sent, or -1 indicating an error.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
-        @param loop - loop this socket will belong to.
         @param port - port number to connect to
+        @param bind - should this socket bind, or connect
+        @param loop - loop this socket will belong to.
         @returns Stream
         '''
         context = zmq.Context.instance()
         socket = context.socket(zmq.PUB)
         zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
 
-        socket.bind(zmq_address.zmq_url())
+        if bind:
+            socket.bind(zmq_address.zmq_url())
+        else:
+            socket.connect(zmq_address.zmq_url())
 
         stream_info = comm_config.StreamMap().get_stream_name(chan_name)
 
@@ -238,7 +246,7 @@ class SocketFactory:
         return stream
 
     @staticmethod
-    def sub_socket(chan_name, on_recv=None, host=None, transport=IPC, port=None, loop=None):
+    def sub_socket(chan_name, on_recv=None, host=None, transport=IPC, port=None, bind=False, loop=None):
         '''
         Create a subscriber socket on the specified chan_name.
 
@@ -248,8 +256,9 @@ class SocketFactory:
                          If set to None - no data will be read from this socket.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
-        @param loop - loop this socket will belong to.
         @param port - port number to connect to
+        @param bind - should this socket bind, or connect
+        @param loop - loop this socket will belong to.
         @returns Stream
         '''
         context = zmq.Context.instance()
@@ -257,7 +266,10 @@ class SocketFactory:
         socket.setsockopt(zmq.SUBSCRIBE, b'')
 
         zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        socket.connect(zmq_address.zmq_url())
+        if bind:
+            socket.bind(zmq_address.zmq_url())
+        else:
+            socket.connect(zmq_address.zmq_url())
 
         stream_info = comm_config.StreamMap().get_stream_name(chan_name)
         stream = Stream(socket,
@@ -268,7 +280,7 @@ class SocketFactory:
         return stream
 
     @staticmethod
-    def req_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, loop=None):
+    def req_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=False, loop=None):
         '''
         Create a request socket on the specified chan_name.
 
@@ -282,15 +294,19 @@ class SocketFactory:
                          If set to None - no data will be read from this socket.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
-        @param loop - loop this socket will belong to. Default is global async loop.
         @param port - port number to connect to
+        @param bind - should this socket bind, or connect
+        @param loop - loop this socket will belong to. Default is global async loop.
         @returns Stream
         '''
         context = zmq.Context.instance()
         socket = context.socket(zmq.REQ)
 
         zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        socket.connect(zmq_address.zmq_url())
+        if bind:
+            socket.bind(zmq_address.zmq_url())
+        else:
+            socket.connect(zmq_address.zmq_url())
 
         stream_info = comm_config.StreamMap().get_stream_name(chan_name)
         stream = Stream(socket,
@@ -302,7 +318,7 @@ class SocketFactory:
         return stream
 
     @staticmethod
-    def rep_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, loop=None):
+    def rep_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=True, loop=None):
         '''
         Create a reply socket on the specified chan_name.
 
@@ -316,15 +332,96 @@ class SocketFactory:
                          If set to None - no data will be read from this socket.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
-        @param loop - loop this socket will belong to. Default is global async loop.
         @param port - port number to connect to
+        @param bind - should this socket bind, or connect
+        @param loop - loop this socket will belong to. Default is global async loop.
         @returns Stream
         '''
         context = zmq.Context.instance()
         socket = context.socket(zmq.REP)
 
         zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        socket.bind(zmq_address.zmq_url())
+        if bind:
+            socket.bind(zmq_address.zmq_url())
+        else:
+            socket.connect(zmq_address.zmq_url())
+
+        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
+        stream = Stream(socket,
+                        stream_info,
+                        zmq_address.zmq_url(),
+                        on_recv=on_recv,
+                        on_send=on_send,
+                        loop=loop)
+        return stream
+
+    @staticmethod
+    def router_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=True, loop=None):
+        '''
+        Create a router socket on the specified chan_name.
+
+        @param chan_name - chan_name of this socket
+        @param on_send - callback when messages are sent on this socket.
+                         It will be called as `on_send([msg1,...,msgN])`
+                         Status is either a positive value indicating
+                         number of bytes sent, or -1 indicating an error.
+        @param on_recv - callback when messages are received on this socket.
+                         It will be called as `on_recv([msg1,...,msgN])`
+                         If set to None - no data will be read from this socket.
+                         The first message will always be the ID of the sender.
+        @param host - hostname, or ip address on which this socket will communicate
+        @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
+        @param port - port number to connect to
+        @param bind - should this socket bind, or connect
+        @param loop - loop this socket will belong to. Default is global async loop.
+        @returns Stream
+        '''
+        context = zmq.Context.instance()
+        socket = context.socket(zmq.ROUTER)
+
+        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
+        if bind:
+            socket.bind(zmq_address.zmq_url())
+        else:
+            socket.connect(zmq_address.zmq_url())
+
+        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
+        stream = Stream(socket,
+                        stream_info,
+                        zmq_address.zmq_url(),
+                        on_recv=on_recv,
+                        on_send=on_send,
+                        loop=loop)
+        return stream
+
+    @staticmethod
+    def dealer_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=True, loop=None):
+        '''
+        Create a dealer socket on the specified chan_name.
+
+        @param chan_name - chan_name of this socket
+        @param on_send - callback when messages are sent on this socket.
+                         It will be called as `on_send([msg1,...,msgN])`
+                         Status is either a positive value indicating
+                         number of bytes sent, or -1 indicating an error.
+        @param on_recv - callback when messages are received on this socket.
+                         It will be called as `on_recv([msg1,...,msgN])`
+                         If set to None - no data will be read from this socket.
+        @param host - hostname, or ip address on which this socket will communicate
+        @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
+        @param port - port number to connect to
+        @param bind - should this socket bind, or connect
+        @param loop - loop this socket will belong to. Default is global async loop.
+        @returns Stream
+        '''
+        context = zmq.Context.instance()
+        socket = context.socket(zmq.DEALER)
+
+        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
+        if bind:
+            socket.bind(zmq_address.zmq_url())
+        else:
+            socket.connect(zmq_address.zmq_url())
 
         stream_info = comm_config.StreamMap().get_stream_name(chan_name)
         stream = Stream(socket,
