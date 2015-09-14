@@ -36,7 +36,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='msg.proto',
   package='base',
-  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"\x1a\n\nUploadFile\x12\x0c\n\x04path\x18\x01 \x02(\t'))
+  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\"+\n\nUploadFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t'))
 
 
 
@@ -181,16 +181,23 @@ _DOUBLE = _descriptor.Descriptor(
 )
 
 
-_UPLOADFILE = _descriptor.Descriptor(
-  name='UploadFile',
-  full_name='base.UploadFile',
+_MOBIUSMODEL = _descriptor.Descriptor(
+  name='MobiusModel',
+  full_name='base.MobiusModel',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='path', full_name='base.UploadFile.path', index=0,
-      number=1, type=9, cpp_type=9, label=2,
+      name='id', full_name='base.MobiusModel.id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='user_id', full_name='base.MobiusModel.user_id', index=1,
+      number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode(b(""), "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -205,7 +212,42 @@ _UPLOADFILE = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=131,
-  serialized_end=157,
+  serialized_end=173,
+)
+
+
+_UPLOADFILE = _descriptor.Descriptor(
+  name='UploadFile',
+  full_name='base.UploadFile',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='path', full_name='base.UploadFile.path', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='user_id', full_name='base.UploadFile.user_id', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=175,
+  serialized_end=218,
 )
 
 DESCRIPTOR.message_types_by_name['String'] = _STRING
@@ -213,6 +255,7 @@ DESCRIPTOR.message_types_by_name['UInt32'] = _UINT32
 DESCRIPTOR.message_types_by_name['Bool'] = _BOOL
 DESCRIPTOR.message_types_by_name['Float'] = _FLOAT
 DESCRIPTOR.message_types_by_name['Double'] = _DOUBLE
+DESCRIPTOR.message_types_by_name['MobiusModel'] = _MOBIUSMODEL
 DESCRIPTOR.message_types_by_name['UploadFile'] = _UPLOADFILE
 
 String = _reflection.GeneratedProtocolMessageType('String', (_message.Message,),
@@ -243,6 +286,12 @@ Double = _reflection.GeneratedProtocolMessageType('Double', (_message.Message,),
     {
       'DESCRIPTOR': _DOUBLE,
       # @@protoc_insertion_point(class_scope:base.Double)
+    })
+
+MobiusModel = _reflection.GeneratedProtocolMessageType('MobiusModel', (_message.Message,),
+    {
+      'DESCRIPTOR': _MOBIUSMODEL,
+      # @@protoc_insertion_point(class_scope:base.MobiusModel)
     })
 
 UploadFile = _reflection.GeneratedProtocolMessageType('UploadFile', (_message.Message,),

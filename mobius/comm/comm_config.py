@@ -7,6 +7,9 @@ STREAM_MAP =\
         "/upload/ready/": dict(
             send_type=msg_pb2.UploadFile
             ),
+        "/mobius/model/": dict(
+            send_type=msg_pb2.MobiusModel
+            ),
     }
 
 

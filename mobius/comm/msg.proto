@@ -27,9 +27,16 @@ message Double
 }
 
 // Mobius model files
+message MobiusModel
+{
+    optional string id = 1;
+    optional string user_id = 2;
+}
+
 message UploadFile
 {
-    required string path = 1;
+    optional string path = 1;
+    optional string user_id = 2;
 }
 
 // vim: set ts=4 sw=4:
