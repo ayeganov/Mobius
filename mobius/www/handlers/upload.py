@@ -1,3 +1,4 @@
+import json
 import tempfile
 
 # Mobius
@@ -39,7 +40,7 @@ class StreamHandler(PostContentHandler):
         '''
         self.set_header("Content-Type", "text/plain")
         self.set_status(self.POST_SUCCESS)
-        self.write("Good job")
+        self.write(json.dumps({"success": True}))
         self.finish()
 
     def _write_file_data(self, headers, data):
@@ -79,9 +80,11 @@ class StreamHandler(PostContentHandler):
         '''
         if self._cur_headers != headers:
             self._cur_headers = headers
+
             if self._file_started:
                 # Changing header, and file has already been started - file was downloaded
                 self._upload_pub.send(UploadFile(path=self._tmp_file.name))
+
             self._file_started = self._get_field_name(self._cur_headers) == self.FILE_FIELD
         try:
             # Process different content types differently
