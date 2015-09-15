@@ -180,14 +180,10 @@ class Stream:
             msg = msg_type()
             try:
                 msg.ParseFromString(d)
-            except TypeError:
+            except:
                 # We are dealing with the envelope frames, simply add them to
                 # the message list
                 msg = d
-            except Exception as e:
-                log.error("Unable to parse protocol message of type {0}".format(msg_type))
-                log.exception(e)
-                continue
             msgs.append(msg)
 
         if msgs:
@@ -210,6 +206,37 @@ class SocketFactory:
     '''
     Convenience class for creating different types of zmq sockets.
     '''
+
+    @staticmethod
+    def _make_stream(socket,
+                     chan_name,
+                     on_recv=None,
+                     on_send=None,
+                     host=None,
+                     transport=IPC,
+                     port=None,
+                     bind=True,
+                     loop=None):
+        '''
+        Helper method to create streams.
+        '''
+        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
+
+        if bind:
+            socket.bind(zmq_address.zmq_url())
+        else:
+            socket.connect(zmq_address.zmq_url())
+
+        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
+
+        stream = Stream(socket,
+                        stream_info,
+                        zmq_address.zmq_url(),
+                        on_recv=on_recv,
+                        on_send=on_send,
+                        loop=loop)
+        return stream
+
     @staticmethod
     def pub_socket(chan_name, on_send=None, host=None, transport=IPC, port=None, bind=True, loop=None):
         '''
@@ -229,21 +256,7 @@ class SocketFactory:
         '''
         context = zmq.Context.instance()
         socket = context.socket(zmq.PUB)
-        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-
-        if bind:
-            socket.bind(zmq_address.zmq_url())
-        else:
-            socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
-
-        stream = Stream(socket,
-                        stream_info,
-                        zmq_address.zmq_url(),
-                        on_send=on_send,
-                        loop=loop)
-        return stream
+        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
 
     @staticmethod
     def sub_socket(chan_name, on_recv=None, host=None, transport=IPC, port=None, bind=False, loop=None):
@@ -265,19 +278,7 @@ class SocketFactory:
         socket = context.socket(zmq.SUB)
         socket.setsockopt(zmq.SUBSCRIBE, b'')
 
-        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        if bind:
-            socket.bind(zmq_address.zmq_url())
-        else:
-            socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
-        stream = Stream(socket,
-                        stream_info,
-                        zmq_address.zmq_url(),
-                        on_recv=on_recv,
-                        loop=loop)
-        return stream
+        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
 
     @staticmethod
     def req_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=False, loop=None):
@@ -302,20 +303,7 @@ class SocketFactory:
         context = zmq.Context.instance()
         socket = context.socket(zmq.REQ)
 
-        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        if bind:
-            socket.bind(zmq_address.zmq_url())
-        else:
-            socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
-        stream = Stream(socket,
-                        stream_info,
-                        zmq_address.zmq_url(),
-                        on_recv=on_recv,
-                        on_send=on_send,
-                        loop=loop)
-        return stream
+        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
 
     @staticmethod
     def rep_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=True, loop=None):
@@ -340,20 +328,7 @@ class SocketFactory:
         context = zmq.Context.instance()
         socket = context.socket(zmq.REP)
 
-        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        if bind:
-            socket.bind(zmq_address.zmq_url())
-        else:
-            socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
-        stream = Stream(socket,
-                        stream_info,
-                        zmq_address.zmq_url(),
-                        on_recv=on_recv,
-                        on_send=on_send,
-                        loop=loop)
-        return stream
+        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
 
     @staticmethod
     def router_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=True, loop=None):
@@ -379,20 +354,7 @@ class SocketFactory:
         context = zmq.Context.instance()
         socket = context.socket(zmq.ROUTER)
 
-        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        if bind:
-            socket.bind(zmq_address.zmq_url())
-        else:
-            socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
-        stream = Stream(socket,
-                        stream_info,
-                        zmq_address.zmq_url(),
-                        on_recv=on_recv,
-                        on_send=on_send,
-                        loop=loop)
-        return stream
+        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
 
     @staticmethod
     def dealer_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=True, loop=None):
@@ -417,17 +379,4 @@ class SocketFactory:
         context = zmq.Context.instance()
         socket = context.socket(zmq.DEALER)
 
-        zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
-        if bind:
-            socket.bind(zmq_address.zmq_url())
-        else:
-            socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
-        stream = Stream(socket,
-                        stream_info,
-                        zmq_address.zmq_url(),
-                        on_recv=on_recv,
-                        on_send=on_send,
-                        loop=loop)
-        return stream
+        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
