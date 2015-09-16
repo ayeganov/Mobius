@@ -36,7 +36,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='msg.proto',
   package='base',
-  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\"+\n\nUploadFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t'))
+  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\"+\n\nUploadFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\"\t\n\x07Request\"\n\n\x08Response'))
 
 
 
@@ -250,6 +250,48 @@ _UPLOADFILE = _descriptor.Descriptor(
   serialized_end=218,
 )
 
+
+_REQUEST = _descriptor.Descriptor(
+  name='Request',
+  full_name='base.Request',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=220,
+  serialized_end=229,
+)
+
+
+_RESPONSE = _descriptor.Descriptor(
+  name='Response',
+  full_name='base.Response',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=231,
+  serialized_end=241,
+)
+
 DESCRIPTOR.message_types_by_name['String'] = _STRING
 DESCRIPTOR.message_types_by_name['UInt32'] = _UINT32
 DESCRIPTOR.message_types_by_name['Bool'] = _BOOL
@@ -257,6 +299,8 @@ DESCRIPTOR.message_types_by_name['Float'] = _FLOAT
 DESCRIPTOR.message_types_by_name['Double'] = _DOUBLE
 DESCRIPTOR.message_types_by_name['MobiusModel'] = _MOBIUSMODEL
 DESCRIPTOR.message_types_by_name['UploadFile'] = _UPLOADFILE
+DESCRIPTOR.message_types_by_name['Request'] = _REQUEST
+DESCRIPTOR.message_types_by_name['Response'] = _RESPONSE
 
 String = _reflection.GeneratedProtocolMessageType('String', (_message.Message,),
     {
@@ -298,6 +342,18 @@ UploadFile = _reflection.GeneratedProtocolMessageType('UploadFile', (_message.Me
     {
       'DESCRIPTOR': _UPLOADFILE,
       # @@protoc_insertion_point(class_scope:base.UploadFile)
+    })
+
+Request = _reflection.GeneratedProtocolMessageType('Request', (_message.Message,),
+    {
+      'DESCRIPTOR': _REQUEST,
+      # @@protoc_insertion_point(class_scope:base.Request)
+    })
+
+Response = _reflection.GeneratedProtocolMessageType('Response', (_message.Message,),
+    {
+      'DESCRIPTOR': _RESPONSE,
+      # @@protoc_insertion_point(class_scope:base.Response)
     })
 
 

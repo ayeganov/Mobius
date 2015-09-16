@@ -39,4 +39,12 @@ message UploadFile
     optional string user_id = 2;
 }
 
+message Request
+{
+}
+
+message Response
+{
+}
+
 // vim: set ts=4 sw=4:
