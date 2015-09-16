@@ -16,6 +16,20 @@ PGM = "pgm"
 EPGM = "epgm"
 
 
+def unroll_list(item_list):
+    '''
+    Generator that unrolls the n-depth list into a flat one.
+
+    @param item_list - list of items
+    @returns a generator which unrols into a flat list
+    '''
+    try:
+        for item in item_list:
+            yield from unroll_list(item)
+    except TypeError:
+        yield item_list
+
+
 class StreamError(Exception):
     '''
     Class representing stream errors.
@@ -166,6 +180,25 @@ class Stream:
         data = msg.SerializeToString()
         self._stream.send(data, **kwds)
 
+    def send_multipart(self, msgs, **kwds):
+        '''
+        Send the given messages on this stream. The list can contain either
+        binary blobs, or protocol buffer messages, which will be serialized
+        automatically.
+
+        @param msg - Google protocol buffer msg to send over this stream.
+        @param kwds - extra keywords that zmq's stream send accepts.
+        '''
+        def serialize(msg):
+            try:
+                data = msg.SerializeToString()
+            except AttributeError:
+                data = msg
+            return data
+
+        msgs = [serialize(msg) for msg in msgs]
+        self._stream.send(msgs, **kwds)
+
     @staticmethod
     def _callback_wrapper(data, msg_type, callback):
         '''
@@ -220,6 +253,7 @@ class SocketFactory:
         '''
         Helper method to create streams.
         '''
+        chan_name = chan_name.rstrip("/")
         zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
 
         if bind:
@@ -256,7 +290,7 @@ class SocketFactory:
         '''
         context = zmq.Context.instance()
         socket = context.socket(zmq.PUB)
-        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
+        return SocketFactory._make_stream(socket, chan_name, None, on_send, host, transport, port, bind, loop)
 
     @staticmethod
     def sub_socket(chan_name, on_recv=None, host=None, transport=IPC, port=None, bind=False, loop=None):
@@ -278,7 +312,7 @@ class SocketFactory:
         socket = context.socket(zmq.SUB)
         socket.setsockopt(zmq.SUBSCRIBE, b'')
 
-        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
+        return SocketFactory._make_stream(socket, chan_name, on_recv, None, host, transport, port, bind, loop)
 
     @staticmethod
     def req_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=False, loop=None):
