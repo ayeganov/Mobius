@@ -18,14 +18,18 @@ EPGM = "epgm"
 
 def unroll_list(item_list):
     '''
-    Generator that unrolls the n-depth list into a flat one.
+    Generator that unrolls the n-depth list into a flat one. Binary blobs won't
+    be unrolled.
 
     @param item_list - list of items
     @returns a generator which unrols into a flat list
     '''
     try:
-        for item in item_list:
-            yield from unroll_list(item)
+        if isinstance(item_list, bytes):
+            yield item_list
+        else:
+            for item in item_list:
+                yield from unroll_list(item)
     except TypeError:
         yield item_list
 
@@ -51,7 +55,7 @@ class ZmqAddress:
         '''
         self._transport = transport.lower()
         self._host = host
-        self._chan_name = chan_name
+        self._chan_name = chan_name.rstrip("/")
         self._port = port
 
         self._is_ipc = self._transport in (IPC, INPROC)
@@ -87,6 +91,8 @@ class Stream:
     This is the main class that interacts with the zmq library to send, and
     receive messages.
     '''
+    SEPARATOR = b''
+
     def __init__(self, socket, stream_info, path, on_recv=None, on_send=None, loop=None):
         '''
         Initializes instance of Stream.
@@ -97,7 +103,8 @@ class Stream:
         @param loop - loop this socket will belong to. Default is global async loop.
         '''
         self._path = path
-        self._stream_info = stream_info
+        self._recv_type = stream_info.recv_type
+        self._send_type = stream_info.send_type
         self._on_recv = on_recv
         self._on_send = on_send
 
@@ -173,31 +180,35 @@ class Stream:
         @param msg - Google protocol buffer msg to send over this stream
         @param kwds - extra keywords that zmq's stream send accepts.
         '''
-        if not isinstance(msg, self._stream_info.send_type):
+        if not isinstance(msg, self._send_type):
             raise ValueError("Wrong message type being sent. {0} is not {1}"
-                             .format(type(msg), type(self._stream_info.send_type)))
+                             .format(type(msg), type(self._send_type)))
 
         data = msg.SerializeToString()
-        self._stream.send(data, **kwds)
+        msgs = [self.SEPARATOR, data]
+        self._stream.send_multipart(msgs, **kwds)
 
-    def send_multipart(self, msgs, **kwds):
+    def reply(self, ids, msg, **kwds):
         '''
-        Send the given messages on this stream. The list can contain either
-        binary blobs, or protocol buffer messages, which will be serialized
-        automatically.
+        Reply with the given message on this stream. The reply will be routed
+        back to the initial socket, based on the given list of ids, if the
+        stream being replied to is the routing proxy. The message type must
+        match that specified in the streams config, or a ValueError will be
+        raised.
 
+        @param ids - a list of socket ids to reply to
         @param msg - Google protocol buffer msg to send over this stream.
         @param kwds - extra keywords that zmq's stream send accepts.
         '''
-        def serialize(msg):
-            try:
-                data = msg.SerializeToString()
-            except AttributeError:
-                data = msg
-            return data
+        if not isinstance(msg, self._send_type):
+            raise ValueError("Wrong message type being sent. {0} is not {1}"
+                             .format(type(msg), type(self._send_type)))
 
-        msgs = [serialize(msg) for msg in msgs]
-        self._stream.send(msgs, **kwds)
+        data = msg.SerializeToString()
+
+        msgs = list(unroll_list([ids, self.SEPARATOR, data]))
+        log.info("Sending multipart: {0}".format(msgs))
+        self._stream.send_multipart(msgs, **kwds)
 
     @staticmethod
     def _callback_wrapper(data, msg_type, callback):
@@ -205,34 +216,143 @@ class Stream:
         Helper method to parse serialized messages that are being sent and
         received for the respective callbacks.
 
+        @param data - data to be sent/received
         @param msg_type - type of message to parse
         @param callback - method to invoke
         '''
         msgs = []
-        for d in data:
+        it = iter(data)
+        # Get envelopes if any
+        for d in it:
+            if d == Stream.SEPARATOR:
+                break
+            else:
+                msgs.append(d)
+        # Get actual GPB messages
+        for d in it:
             msg = msg_type()
             try:
                 msg.ParseFromString(d)
             except:
-                # We are dealing with the envelope frames, simply add them to
-                # the message list
-                msg = d
+                log.exception("Unable to parse the protocol buffer message.")
+                continue
             msgs.append(msg)
 
         if msgs:
             callback(msgs)
 
     def _recv_wrapper(self, data):
-        self._callback_wrapper(data, self._stream_info.recv_type, self._on_recv)
+        self._callback_wrapper(data, self._recv_type, self._on_recv)
 
     def _send_wrapper(self, data, _):
-        self._callback_wrapper(data, self._stream_info.send_type, self._on_send)
+        self._callback_wrapper(data, self._send_type, self._on_send)
 
     def close(self):
         '''
         Close this stream.
         '''
         self._stream.close()
+
+
+class RouterPubSubProxy:
+    '''
+    This is a proxy that has one front end socket, and two backend sockets. The
+    front end socket is a router that passes the messages to backend Pub. Pub
+    broadcasts them to all subscribers, which respond with results to backend
+    Sub. All communications on this proxy are done through IPC.
+    '''
+    def __init__(self,
+                 front,
+                 back_out,
+                 back_in,
+                 loop):
+        '''
+        Initializes the instance of RouterPubSubProxy.
+
+        @param front - channel name to be the routing stream
+        @param back_out - channel name of the publishing stream
+        @param back_in - channel name of result receiving stream
+        @param loop - IOLoop
+        '''
+        self._loop = loop
+
+        ctx = zmq.Context.instance()
+
+        # Create the front end stream
+        front_address = ZmqAddress(chan_name=front)
+        self._front_stream = ZMQStream(ctx.socket(zmq.ROUTER), io_loop=loop)
+        self._front_stream.setsockopt(zmq.ROUTER_MANDATORY, 1)
+        self._front_stream.bind(front_address.zmq_url())
+
+        # Create the back end streams
+        back_out_address = ZmqAddress(chan_name=back_out)
+        self._back_out_stream = ZMQStream(ctx.socket(zmq.PUB), io_loop=loop)
+        self._back_out_stream.bind(back_out_address.zmq_url())
+
+        back_in_address = ZmqAddress(chan_name=back_in)
+        self._back_in_stream = ZMQStream(ctx.socket(zmq.SUB), io_loop=loop)
+        self._back_in_stream.setsockopt(zmq.SUBSCRIBE, b'')
+        self._back_in_stream.bind(back_in_address.zmq_url())
+
+        def callback(from_name, to_name, zmq_stream, msgs):
+            log.info("Routing from {0} to {1} messages {2}"
+                     .format(from_name, to_name, msgs))
+            zmq_stream.send_multipart(msgs)
+            zmq_stream.flush()
+
+        self._front_stream.on_recv(lambda msgs:
+                                   callback(front, back_out, self._back_out_stream, msgs))
+        self._back_in_stream.on_recv(lambda msgs:
+                                     callback(back_in, front, self._front_stream, msgs))
+
+    def start(self):
+        '''
+        Start this proxy.
+        '''
+        self._loop.start()
+
+
+class LocalRequestProxy:
+    '''
+    This class is responsible for routing client requests coming from a
+    particular server to the RouterPubSubProxy, which will route them to the
+    workers.
+    '''
+    def __init__(self, front_end_name, back_end_name, loop):
+        '''
+        Initializes an instance of LocalRequestProxy
+
+        @param front_end_name - name of the front end socket. It will be
+                                initialized with the Router socket.
+        @param back_end_name - name of the back end socket. It will be
+                               initialized with the Dealer socket.
+        @param loop - zmq IOLoop
+        '''
+        self._loop = loop
+
+        ctx = zmq.Context.instance()
+
+        # Create the front end stream
+        front_address = ZmqAddress(chan_name=front_end_name, transport=INPROC)
+        self._front_end = ZMQStream(ctx.socket(zmq.ROUTER), io_loop=loop)
+        self._front_end.setsockopt(zmq.ROUTER_MANDATORY, 1)
+        self._front_end.bind(front_address.zmq_url())
+
+        # Create the back end stream
+        back_address = ZmqAddress(chan_name=back_end_name)
+        self._back_end = ZMQStream(ctx.socket(zmq.DEALER), io_loop=loop)
+        self._back_end.connect(back_address.zmq_url())
+
+        def callback(from_name, to_name, zmq_stream, msgs):
+            log.info("Routing from {0} to {1} messages {2}"
+                     .format(from_name, to_name, msgs))
+            zmq_stream.send_multipart(msgs)
+            zmq_stream.flush()
+
+        self._front_end.on_recv(lambda msgs:
+                                callback(front_end_name, back_end_name, self._back_end, msgs))
+        self._back_end.on_recv(lambda msgs:
+                               callback(back_end_name, front_end_name, self._front_end, msgs))
 
 
 class SocketFactory:
