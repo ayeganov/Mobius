@@ -4,10 +4,32 @@ from mobius.utils import Singleton
 
 STREAM_MAP =\
     {
-        "/upload/ready/": dict(
+        "/upload/ready": dict(
             send_type=msg_pb2.UploadFile
-            ),
+        ),
+        "/mobius/model": dict(
+            send_type=msg_pb2.MobiusModel
+        ),
+        "/request/local": dict(
+            send_type=msg_pb2.Request,
+            recv_type=msg_pb2.Response
+        ),
+        "/request/request": dict(
+            send_type=msg_pb2.Request,
+        ),
+        "/request/do_work": dict(
+            send_type=msg_pb2.Request,
+        ),
+        "/request/result": dict(
+            send_type=msg_pb2.Response,
+        ),
     }
+
+
+class StreamConfigError(Exception):
+    '''
+    Errors in stream configuration
+    '''
 
 
 class StreamInfo:
@@ -62,14 +84,14 @@ class StreamMap(metaclass=Singleton):
         self._stream_infos = {name: self._create_stream_info(name, msg)
                               for name, msg in STREAM_MAP.items()}
 
-    def _create_stream_info(self, chan_name, msg_types):
+    def _create_stream_info(self, chan_name, params):
         '''
         Helper method to turn a config entry into a stream info object.
 
         @param chan_name - name of the channel
-        @param msg_types - types of messages associated with this channel
+        @param params - types of messages associated with this channel etc
         '''
-        stream_info = StreamInfo(chan_name, **msg_types)
+        stream_info = StreamInfo(chan_name, **params)
         return stream_info
 
     def get_stream_name(self, chan_name):
@@ -82,4 +104,4 @@ class StreamMap(metaclass=Singleton):
         try:
             return self._stream_infos[chan_name]
         except KeyError:
-            raise stream.StreamError("Channel '{0}' doesn't exist.".format(chan_name))
+            raise StreamConfigError("Channel '{0}' doesn't exist.".format(chan_name))
