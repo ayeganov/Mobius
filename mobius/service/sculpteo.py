@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 
-from concurrent.futures import CancelledError
 from concurrent.futures import ProcessPoolExecutor
 import json
 import logging
-import os
 import requests
-import time
 
 from zmq.eventloop import IOLoop
 
-from mobius.comm.stream import SocketFactory
-from mobius.comm.msg_pb2 import Response
-from mobius.service import UPLOAD, QUOTE, TEST
+from mobius.service import ICommand, CommandFactory, BaseService
 from mobius.utils import set_up_logging
 
 
@@ -22,156 +17,111 @@ log = logging.getLogger(__name__)
 DESIGN_PRICE_URL = "http://www.sculpteo.com/en/api/design/3D/price_by_uuid/"
 UPLOAD_URL = "https://www.sculpteo.com/en/upload_design/a/3D/"
 
-upload_file = "/tmp/upper_wing_right.stl"
-
-NUM_WORKERS = 20
+NUM_WORKERS = 5
 
 
-def _get_quote(model_id):
+class QuoteCommand(ICommand):
     '''
-    Issue a request to sculpteo service to get the price of the model.
-
-    @param model_id - id of the file in the sculpteo system
+    Issue a request to sculpteo service to get the price of the provided model.
     '''
-    url_request = "?".join((DESIGN_PRICE_URL, model_id))
-    response = requests.get(url=url_request).json()
-    return response
+    def __init__(self, model_id):
+        '''
+        Initialize QuoteService instance.
+
+        @param model_id - mobius id of the file to quote
+        '''
+        self._model_id = model_id
+        # TODO: Make connection to the database
+        self._db = None
+
+    def __call__(self):
+        sculpteo_id = self._get_sculpteo_id()
+        url_request = "?".join((DESIGN_PRICE_URL, sculpteo_id))
+        response = requests.get(url=url_request).json()
+        return json.dumps(response)
+    __call__.__doc__ == ICommand.__call__.__doc__
+
+    def _get_sculpteo_id(self):
+        '''
+        Retrieve the sculpteo id associated with the provided mobius id.
+
+        @returns str
+            sculpteo id
+        '''
+        return self._model_id
 
 
-def _upload_file(file_id):
+class UploadCommand(ICommand):
     '''
     Retrieves the file data from the database associated with the provided
-    file_id then uploads this file to Sculpteo.
-
-    @param file_id - database id of the file to be uploaded to Sculpteo
+    mobius file id then uploads this file to Sculpteo.
     '''
-    # Establish connection to PostgreSQL and retrieve the file data
-    with open(upload_file, "rb") as f:
+    def __init__(self, mobius_id):
+        '''
+        @param mobius_id - database id of the file to be uploaded to Sculpteo
+        '''
+        self._mobius_id = mobius_id
+        # TODO: Make connection to the database
+        self._db = None
+
+    def __call__(self):
         headers = {"X-Requested-With": "XMLHttpRequest"}
-        files = {"file": (os.path.basename(upload_file), f)}
+        file_handle = self._get_file_handle()
+        files = {"file": ("mobius_file", file_handle)}
         params = {"name": "test", "designer": "bobik", "password": "password", "share": 0}
         upload_stat = requests.post(url=UPLOAD_URL, files=files, data=params, headers=headers)
         return json.dumps(upload_stat.json())
+    __call__.__doc__ == ICommand.__call__.__doc__
+
+    def _get_file_handle(self):
+        '''
+        Reads the file data from the database and returns a file handle to it.
+
+        @returns binary file handle
+        '''
+        return self._db.fetch_file(self._mobius_id)
 
 
-def _test(model):
-    print("Testing model: {0}".format(model))
-    time.sleep(1)
-    return "SUCCESS"
-
-
-WORKERS = {
-    QUOTE: _get_quote,
-    UPLOAD: _upload_file,
-    TEST: _test
-}
-
-
-class ServiceError(Exception):
+class SculpteoCommandFactory(CommandFactory):
     '''
-    All service errors should use this exception type.
+    Sculpteo command factory that creates Sculpteo specific commands.
     '''
+    def __init__(self, name):
+        '''
+        Initialize instance of SculpteoCommandFactory
+
+        @param name - name of the service.
+        '''
+        super(SculpteoCommandFactory, self).__init__(name)
+
+    def make_upload_command(self, request):
+        return UploadCommand(request.model.id)
+    make_upload_command.__doc__ = CommandFactory.make_upload_command.__doc__
+
+    def make_quote_command(self, request):
+        return QuoteCommand(request.model.id)
+    make_quote_command.__doc__ = CommandFactory.make_quote_command.__doc__
 
 
-class Sculpteo:
+class Sculpteo(BaseService):
     '''
-    This service accepts a Request message and responds with a Response
-    message.
+    This service implements the details of communicating with the Sculpteo.com.
     '''
-    NAME = "SCULPTEO"
-
     def __init__(self, executor, loop):
         '''
         Initialize instance of Sculpteo service
         '''
-        self._loop = loop
-        self._work_sub = SocketFactory.sub_socket("/request/do_work",
-                                                  on_recv=self.process_request,
-                                                  loop=loop)
-        self._work_result = SocketFactory.pub_socket("/request/result",
-                                                     bind=False,
-                                                     loop=loop)
-        self._executor = executor
-        self._futures = {}
+        super(Sculpteo, self).__init__(executor, loop)
+        self._name = "Sculpteo"
+        self._factory = SculpteoCommandFactory(self._name)
 
-    def _respond_error(self, request, error):
-        '''
-        Respond with error to the given request.
+    @property
+    def name(self):
+        return self._name
 
-        @param request - request that failed to be processed
-        @param error - exception describing the failure
-        '''
-        log.debug("Responding with error to {0} with {1}".format(request, error))
-        json_error = json.dumps({"error": str(error)})
-
-        server_id, request_id, request = request
-        response = Response(service_name=Sculpteo.NAME,
-                            error=json_error)
-        self._work_result.reply([server_id, request_id],
-                                response)
-
-    def _respond_success(self, request, result):
-        '''
-        Return the result of the computation to the requestor.
-
-        @param request - original request message
-        @param result - result of the computation
-        '''
-        log.debug("Responding successfully to {0} with {1}".format(request, result))
-        server_id, request_id, request = request
-        response = Response(service_name=Sculpteo.NAME,
-                            response=result)
-        self._work_result.reply([server_id, request_id],
-                                response)
-
-    def process_request(self, msgs):
-        '''
-        Process the new request message.
-
-        @param msgs - a request to do some work
-        '''
-        request_id, server_id, request = msgs
-        try:
-            log.debug("Got work request: {0} from server {1} request {2}"
-                      .format(request, server_id, request_id))
-            worker = WORKERS[request.type]
-            future = self._executor.submit(worker, request.model.id)
-            self._futures[future] = (request_id, server_id, request)
-            future.add_done_callback(self._finish_request)
-        except KeyError:
-            log.exception()
-            self._respond_error(request,
-                                ServiceError("Unknown request type: {0}".format(request.type)))
-        except Exception as e:
-            log.exception(e)
-            self._respond_error(request)
-
-    def _finish_request(self, future):
-        '''
-        After request is procesed return the result to the requestor
-
-        @param future - result of work
-        '''
-        request = self._futures[future]
-
-        def finish_up():
-            try:
-                log.debug("Finished work for {0}".format(request))
-                result = future.result(timeout=0)
-                self._respond_success(request, result)
-            except CancelledError as ce:
-                log.exception(ce)
-                self._respond_error(request, ce)
-            except Exception as e:
-                log.exception(e)
-                self._respond_error(request, e)
-            finally:
-                self._futures.pop(future)
-
-        self._loop.add_callback(finish_up)
-
-    def start(self):
-        self._loop.start()
+    @property
+    def cmd_factory(self):
+        return self._factory
 
 
 def main():
