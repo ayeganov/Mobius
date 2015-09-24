@@ -7,6 +7,14 @@ import tornado.gen
 from tornado.web import RequestHandler, stream_request_body
 
 
+def get_max_request_buffer():
+    '''
+    This function returns the size of the maximum file that can be uploaded to
+    mobius.
+    '''
+    return (1024 * 1024) * 60
+
+
 class SizeLimitError(Exception):
     '''
     In case trying to retrieve extremely large values.
