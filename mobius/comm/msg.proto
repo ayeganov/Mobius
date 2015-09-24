@@ -26,7 +26,7 @@ message Double
     required double val = 1;
 }
 
-// Mobius model messages
+// Mobius model files
 message MobiusModel
 {
     optional string id = 1;
@@ -36,14 +36,13 @@ message MobiusModel
 message UploadFile
 {
     optional string path = 1;
-    optional int64  db_id = 2;
-    optional string user_id = 3;
+    optional string user_id = 2;
 }
 
 message Request
 {
-    optional string type = 1;
-    optional string data = 2;
+    optional int32 command = 1;
+    optional string data    = 2;
     optional MobiusModel model = 3;
 }
 
