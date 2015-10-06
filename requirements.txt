@@ -1,2 +1,4 @@
+psycopg2
+SQLAlchemy
 tornado >= 4.2.0
 zmq

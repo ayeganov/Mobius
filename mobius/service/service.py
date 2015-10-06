@@ -4,7 +4,7 @@ import json
 import logging
 
 from mobius.comm.stream import SocketFactory
-from mobius.comm.msg_pb2 import Response
+from mobius.comm.msg_pb2 import ProviderResponse
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ class Command(enum.IntEnum):
     '''
     QUOTE = 1
     UPLOAD = 2
+    SAVE_FILE = 3
 
 
 class ICommand(metaclass=abc.ABCMeta):
@@ -36,70 +37,145 @@ class ICommand(metaclass=abc.ABCMeta):
         """
 
 
-class CommandFactory:
+class AbstractFactory(metaclass=abc.ABCMeta):
     '''
     Factory for creating command objects.
 
     Takes in a Request message, and based on its type creates an appropriate
-    Command object.
+    Command object. Implementers must provide the commands dictionary mapping
+    Command enums to appropriate methods creating the requested commands.
     '''
-    def __init__(self, service_name):
+    @abc.abstractproperty
+    def commands(self):
         '''
-        Initialize instance of CommandFactory.
-
-        @param service_name - name of the service using this instance of factory
+        Dictionary of the commands this factory knows how to create. The keys
+        must match the Command enum entries.
         '''
-        self._service_name = service_name
 
+    def create_command(self, request, context=None):
+        '''
+        Create a command object based on the provided request message.
+
+        @param request - an instance of Request message defined in msg.proto
+        @param context - context containing extra data to be passed to commands
+        @returns a concrete instance of ICommand interface
+        '''
+        try:
+            return self.commands[request.command](request, context=context)
+        except KeyError:
+            raise ServiceError("{0} does not support command {1}"
+                               .format(self.__class__.__name__, Command(request.command)))
+
+
+class ProviderFactory(AbstractFactory):
+    '''
+    This factory knows how to make commands for 3D providers.
+    '''
+    def __init__(self):
+        '''
+        Initialize instance of ProviderFactory.
+        '''
         self._commands = {
             Command.QUOTE: self.make_quote_command,
             Command.UPLOAD: self.make_upload_command
         }
 
-    def create_command(self, request):
-        '''
-        Create a command object based on the provided request message.
-
-        @param request - an instance of Request message defined in msg.proto
-        @returns a concrete instance of ICommand interface
-        '''
-        try:
-            return self._commands[request.command](request)
-        except KeyError:
-            raise ServiceError("{0} does not support command {1}"
-                               .format(self._service_name, str(request.command)))
+    @property
+    def commands(self):
+        return self._commands
 
     @abc.abstractmethod
-    def make_upload_command(self, request):
+    def make_upload_command(self, request, context=None):
         '''
         Create an instance of the upload command
 
         @param request - an instance of Request message defined in msg.proto
+        @param context - context containing extra data maybe needed by this
+                         command
         '''
 
     @abc.abstractmethod
-    def make_quote_command(self, request):
+    def make_quote_command(self, request, context=None):
         '''
         Create an instance of the quote command
 
         @param request - an instance of Request message defined in msg.proto
+        @param context - context containing extra data maybe needed by this
+                         command
+        '''
+
+    def get_service_context(self):
+        '''
+        Default implementation doesn't have any context.
+        '''
+        return None
+
+
+class IService(metaclass=abc.ABCMeta):
+    '''
+    This is a service interface that defines the core service methods. This
+    interface assumes the usage of 0MQ sockets as the driving mechanism of
+    execution.
+    '''
+    @abc.abstractproperty
+    def cmd_factory(self):
+        '''
+        Return the factory which knows how to create commands for this service.
+        '''
+
+    @abc.abstractmethod
+    def get_service_context(self):
+        '''
+        Return service specific context with extra data that needs to be passed
+        down to the workers.
+        '''
+
+    @abc.abstractmethod
+    def process_request(self, envelope, request):
+        '''
+        Determine the request type and issue an appropriate command.
+
+        @param envelope - 0MQ socket ids to respond back to the correct requestor
+        @param request - original request message
+        @param result - result of the computation
+        '''
+
+    @abc.abstractmethod
+    def respond_success(self, envelope, request, result):
+        '''
+        Given the original request, and produced result create a message to
+        respond back to the requestor.
+
+        @param envelope - 0MQ socket ids to respond back to the correct requestor
+        @param request - the original request message
+        @param result - result of the computation
+        '''
+
+    @abc.abstractmethod
+    def respond_error(self, envelope, request, error):
+        '''
+        Given the original request, and error produced during computatoin
+        create a message to respond back to the requestor.
+
+        @param envelope - 0MQ socket ids to respond back to the correct requestor
+        @param request - the original request message
+        @param error - error encountered during computation
         '''
 
 
-class BaseService:
+class BaseService(IService):
     '''
-    This service accepts a Request message and responds with a Response
-    message. Extenders must define a self.cmd_factory property, which must
-    return a concrete instance of CommandFactory. Extender must implement their
-    own version of CommandFactory.
+    This service accepts a message with command attribute and replies with a
+    user specified message message. Extenders must define a self.cmd_factory
+    property, which must return a concrete instance of CommandFactory. Extender
+    must implement their own version of CommandFactory.
     '''
-
     def __init__(self, executor, loop):
         '''
-        Initialize instance of Sculpteo service
+        Initialize instance of base service
 
         @param executor - an instance of ProcessPoolExecutor, or ThreadPoolExecutor
-        @param loop - zme eventloop
+        @param loop - zmq eventloop
         '''
         self._loop = loop
         self._work_sub = SocketFactory.sub_socket("/request/do_work",
@@ -117,59 +193,36 @@ class BaseService:
         Return the name of this service.
         '''
 
-    @abc.abstractproperty
-    def cmd_factory(self):
-        '''
-        Return the factory which knows how to create commands for this service.
-        '''
-
-    def _respond_error(self, request, error):
-        '''
-        Respond with error to the given request.
-
-        @param request - request that failed to be processed
-        @param error - exception describing the failure
-        '''
+    def respond_error(self, envelope, request, error):
         log.debug("Responding with error to {0} with {1}".format(request, error))
         json_error = json.dumps({"error": str(error)})
 
-        server_id, request_id, request = request
-        response = Response(service_name=self.name,
-                            error=json_error)
-        self._work_result.reply([server_id, request_id],
-                                response)
+        response = ProviderResponse(service_name=self.name,
+                                    error=json_error)
+        self._work_result.reply(envelope, response)
+    respond_error.__doc__ = IService.respond_error.__doc__
 
-    def _respond_success(self, request, result):
-        '''
-        Return the result of the computation to the requestor.
-
-        @param request - original request message
-        @param result - result of the computation
-        '''
+    def respond_success(self, envelope, request, result):
         log.debug("Responding successfully to {0} with {1}".format(request, result))
-        server_id, request_id, request = request
-        response = Response(service_name=self.name,
-                            response=result)
-        self._work_result.reply([server_id, request_id],
-                                response)
+        response = ProviderResponse(service_name=self.name,
+                                    response=result)
+        self._work_result.reply(envelope, response)
+    respond_success.__doc__ = IService.respond_success.__doc__
 
-    def process_request(self, msgs):
-        '''
-        Process the new request message.
-
-        @param msgs - a request to do some work
-        '''
-        request_id, server_id, request = msgs
+    def process_request(self, envelope, msgs):
+        request = msgs[-1]
         try:
-            log.debug("Got work request: {0} from server {1} request {2}"
-                      .format(request, server_id, request_id))
-            worker = self.cmd_factory.create_command(request)
+            log.debug("Got work request: {0} from {1})"
+                      .format(request, envelope))
+            context = self.get_service_context()
+            worker = self.cmd_factory.create_command(request, context)
             future = self._executor.submit(worker)
-            self._futures[future] = (request_id, server_id, request)
+            self._futures[future] = (envelope, request)
             future.add_done_callback(self._finish_request)
         except Exception as e:
             log.exception(e)
-            self._respond_error(request, e)
+            self.respond_error(envelope, request, e)
+    process_request.__doc__ = IService.process_request.__doc__
 
     def _finish_request(self, future):
         '''
@@ -177,16 +230,16 @@ class BaseService:
 
         @param future - result of work
         '''
-        request = self._futures[future]
+        envelope, request = self._futures[future]
 
         def finish_up():
             try:
                 log.debug("Finished work for {0}".format(str(request)))
                 result = future.result(timeout=0)
-                self._respond_success(request, result)
+                self.respond_success(envelope, request, result)
             except Exception as e:
                 log.exception(e)
-                self._respond_error(request, e)
+                self.respond_error(envelope, request, e)
             finally:
                 self._futures.pop(future)
 

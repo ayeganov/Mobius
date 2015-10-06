@@ -14,19 +14,23 @@ from tornado.web import (RequestHandler,
                          Application,
                          StaticFileHandler)
 
+from mobius.db import db
 from mobius.comm import stream
-from mobius.comm.msg_pb2 import Request, MobiusModel
+from mobius.comm.msg_pb2 import ProviderRequest, MobiusModel
 from mobius.comm.stream import SocketFactory
 from mobius.service import Command
-from mobius.utils import set_up_logging, get_tmp_dir
+from mobius.utils import set_up_logging
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
 
 
 log = logging.getLogger(__name__)
 
-# TODO: Fix this by creating a util module
-TMP_DIR = "/run/shm/"
+
+username = "vagrant"
+authentication = "tmp"
+dbname = "mydb"
+host = "localhost"
 
 
 class MainHandler(RequestHandler):
@@ -34,7 +38,27 @@ class MainHandler(RequestHandler):
     This handler is responsible for serving up the root page of the
     application.
     '''
+    def initialize(self, db_handle):
+        self._db_handle = db_handle
+        self._user_id = None
+
     def get(self):
+        user_id = self.get_secure_cookie("user_id")
+        if user_id:
+            log.info("Welcome user: {0}".format(user_id))
+        else:
+            with self._db_handle.session_scope() as session:
+                user = session.query(db.User).filter_by(id=self._user_id).first()
+                if user is None:
+                    user = db.User(first_name="First", last_name="Last", password="foo")
+                    session.add(user)
+                    session.commit()
+
+                    self.set_secure_cookie("user_id", str(user.id))
+                    self._user_id = user.id
+                    log.info("Saved user")
+                else:
+                    log.info("Welcome user {0}".format(self._user_id))
         self.render("index.html")
 
 
@@ -52,7 +76,7 @@ class TestHandler(RequestHandler):
 
         self._request_future = None
 
-    def _process_result(self, msgs):
+    def _process_result(self, envelope, msgs):
         response = msgs[-1]
         log.info("Response: {0}".format(msgs))
         self._request_future.set_result(response)
@@ -61,10 +85,11 @@ class TestHandler(RequestHandler):
     def get(self):
         log.info("Test handler get")
         self._request_future = Future()
+        model_id = self.get_argument("uuid", default="dummy")
 
-        mob_model = MobiusModel(id="hello", user_id="world")
-        request = Request(command=Command.QUOTE.value,
-                          model=mob_model)
+        mob_model = MobiusModel(id=43, user_id=3)
+        request = ProviderRequest(command=Command.QUOTE.value,
+                                  model=mob_model)
         self._request_dealer.send(request)
 
         log.info("Lets wait here one second.")
@@ -118,26 +143,36 @@ def main():
 
         set_up_logging(logging.DEBUG if args.verbose else logging.INFO)
         loop = eventloop.IOLoop.instance()
-        upload_pub = SocketFactory.pub_socket("/upload/ready/")
         local_proxy = stream.LocalRequestProxy(front_end_name="/request/local",
                                                back_end_name="/request/request",
                                                loop=loop)
+
+        settings = {
+            "cookie_secret": "lkjasdflkjblkjq/DKkjfk394823kfjdf/aklsdjf="
+        }
+
+        db_url = "postgresql://{usr}:{pswd}@{host}/{db}".format(usr=username,
+                                                                pswd=authentication,
+                                                                host=host,
+                                                                db=dbname)
+        db_handle = db.DBHandle(db_url, True)
         app = Application(
             [
                 # Static file handlers
                 (r'/(favicon.ico)', StaticFileHandler, {"path": ""}),
 
                 # File upload handler
-                (r'/upload', upload.StreamHandler, {"tmp_dir": get_tmp_dir(), "upload_pub": upload_pub}),
+                (r'/upload', upload.StreamHandler, {"loop": loop}),
 
                 (r'/test', TestHandler, {"loop": loop}),
 
                 # Page handlers
-                (r"/", MainHandler),
+                (r"/", MainHandler, {"db_handle": db_handle}),
             ],
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
             static_path=os.path.join(os.path.dirname(__file__), "static"),
-            debug=True
+            debug=True,
+            **settings
         )
 
         server = HTTPServer(app, max_body_size=get_max_request_buffer())

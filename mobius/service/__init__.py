@@ -1,5 +1,6 @@
-from .service import (Command,
+from .service import (
+                      AbstractFactory,
+                      BaseService,
+                      Command,
                       ICommand,
-                      CommandFactory,
-                      BaseService
-                      )
+                      ProviderFactory,)

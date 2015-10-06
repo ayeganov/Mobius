@@ -7,7 +7,7 @@ import requests
 
 from zmq.eventloop import IOLoop
 
-from mobius.service import ICommand, CommandFactory, BaseService
+from mobius.service import ICommand, ProviderFactory, BaseService
 from mobius.utils import set_up_logging
 
 
@@ -30,7 +30,8 @@ class QuoteCommand(ICommand):
 
         @param model_id - mobius id of the file to quote
         '''
-        self._model_id = model_id
+#        self._model_id = model_id
+        self._model_id = "N7SnJwCL"
         # TODO: Make connection to the database
         self._db = None
 
@@ -48,7 +49,7 @@ class QuoteCommand(ICommand):
         @returns str
             sculpteo id
         '''
-        return self._model_id
+        return "uuid={0}".format(self._model_id)
 
 
 class UploadCommand(ICommand):
@@ -82,25 +83,17 @@ class UploadCommand(ICommand):
         return self._db.fetch_file(self._mobius_id)
 
 
-class SculpteoCommandFactory(CommandFactory):
+class SculpteoFactory(ProviderFactory):
     '''
     Sculpteo command factory that creates Sculpteo specific commands.
     '''
-    def __init__(self, name):
-        '''
-        Initialize instance of SculpteoCommandFactory
-
-        @param name - name of the service.
-        '''
-        super(SculpteoCommandFactory, self).__init__(name)
-
-    def make_upload_command(self, request):
+    def make_upload_command(self, request, context=None):
         return UploadCommand(request.model.id)
-    make_upload_command.__doc__ = CommandFactory.make_upload_command.__doc__
+    make_upload_command.__doc__ = ProviderFactory.make_upload_command.__doc__
 
-    def make_quote_command(self, request):
+    def make_quote_command(self, request, context=None):
         return QuoteCommand(request.model.id)
-    make_quote_command.__doc__ = CommandFactory.make_quote_command.__doc__
+    make_quote_command.__doc__ = ProviderFactory.make_quote_command.__doc__
 
 
 class Sculpteo(BaseService):
@@ -113,7 +106,7 @@ class Sculpteo(BaseService):
         '''
         super(Sculpteo, self).__init__(executor, loop)
         self._name = "Sculpteo"
-        self._factory = SculpteoCommandFactory(self._name)
+        self._factory = SculpteoFactory()
 
     @property
     def name(self):

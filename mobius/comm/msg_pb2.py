@@ -36,7 +36,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='msg.proto',
   package='base',
-  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\"+\n\nUploadFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\"J\n\x07Request\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\t\x12 \n\x05model\x18\x03 \x01(\x0b\x32\x11.base.MobiusModel\"A\n\x08Response\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\x12\x10\n\x08response\x18\x02 \x01(\t\x12\r\n\x05\x65rror\x18\x03 \x01(\t'))
+  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0f\n\x07user_id\x18\x02 \x01(\x05\"M\n\tDBRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x10\n\x08\x66ilename\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\x05\"N\n\nDBResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12 \n\x05model\x18\x02 \x01(\x0b\x32\x11.base.MobiusModel\x12\r\n\x05\x65rror\x18\x03 \x01(\t\"R\n\x0fProviderRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\t\x12 \n\x05model\x18\x03 \x01(\x0b\x32\x11.base.MobiusModel\"I\n\x10ProviderResponse\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\x12\x10\n\x08response\x18\x02 \x01(\t\x12\r\n\x05\x65rror\x18\x03 \x01(\t'))
 
 
 
@@ -190,15 +190,15 @@ _MOBIUSMODEL = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='id', full_name='base.MobiusModel.id', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='user_id', full_name='base.MobiusModel.user_id', index=1,
-      number=2, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -216,24 +216,38 @@ _MOBIUSMODEL = _descriptor.Descriptor(
 )
 
 
-_UPLOADFILE = _descriptor.Descriptor(
-  name='UploadFile',
-  full_name='base.UploadFile',
+_DBREQUEST = _descriptor.Descriptor(
+  name='DBRequest',
+  full_name='base.DBRequest',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='path', full_name='base.UploadFile.path', index=0,
-      number=1, type=9, cpp_type=9, label=1,
+      name='command', full_name='base.DBRequest.command', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='path', full_name='base.DBRequest.path', index=1,
+      number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode(b(""), "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='user_id', full_name='base.UploadFile.user_id', index=1,
-      number=2, type=9, cpp_type=9, label=1,
+      name='filename', full_name='base.DBRequest.filename', index=2,
+      number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='user_id', full_name='base.DBRequest.user_id', index=3,
+      number=4, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -247,75 +261,33 @@ _UPLOADFILE = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=175,
-  serialized_end=218,
+  serialized_end=252,
 )
 
 
-_REQUEST = _descriptor.Descriptor(
-  name='Request',
-  full_name='base.Request',
+_DBRESPONSE = _descriptor.Descriptor(
+  name='DBResponse',
+  full_name='base.DBResponse',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='command', full_name='base.Request.command', index=0,
-      number=1, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
+      name='success', full_name='base.DBResponse.success', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='data', full_name='base.Request.data', index=1,
-      number=2, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode(b(""), "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='model', full_name='base.Request.model', index=2,
-      number=3, type=11, cpp_type=10, label=1,
+      name='model', full_name='base.DBResponse.model', index=1,
+      number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  serialized_start=220,
-  serialized_end=294,
-)
-
-
-_RESPONSE = _descriptor.Descriptor(
-  name='Response',
-  full_name='base.Response',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
     _descriptor.FieldDescriptor(
-      name='service_name', full_name='base.Response.service_name', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode(b(""), "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='response', full_name='base.Response.response', index=1,
-      number=2, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode(b(""), "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='error', full_name='base.Response.error', index=2,
+      name='error', full_name='base.DBResponse.error', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode(b(""), "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
@@ -330,20 +302,106 @@ _RESPONSE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=296,
-  serialized_end=361,
+  serialized_start=254,
+  serialized_end=332,
 )
 
-_REQUEST.fields_by_name['model'].message_type = _MOBIUSMODEL
+
+_PROVIDERREQUEST = _descriptor.Descriptor(
+  name='ProviderRequest',
+  full_name='base.ProviderRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='command', full_name='base.ProviderRequest.command', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='data', full_name='base.ProviderRequest.data', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='model', full_name='base.ProviderRequest.model', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=334,
+  serialized_end=416,
+)
+
+
+_PROVIDERRESPONSE = _descriptor.Descriptor(
+  name='ProviderResponse',
+  full_name='base.ProviderResponse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='service_name', full_name='base.ProviderResponse.service_name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='response', full_name='base.ProviderResponse.response', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='error', full_name='base.ProviderResponse.error', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=418,
+  serialized_end=491,
+)
+
+_DBRESPONSE.fields_by_name['model'].message_type = _MOBIUSMODEL
+_PROVIDERREQUEST.fields_by_name['model'].message_type = _MOBIUSMODEL
 DESCRIPTOR.message_types_by_name['String'] = _STRING
 DESCRIPTOR.message_types_by_name['UInt32'] = _UINT32
 DESCRIPTOR.message_types_by_name['Bool'] = _BOOL
 DESCRIPTOR.message_types_by_name['Float'] = _FLOAT
 DESCRIPTOR.message_types_by_name['Double'] = _DOUBLE
 DESCRIPTOR.message_types_by_name['MobiusModel'] = _MOBIUSMODEL
-DESCRIPTOR.message_types_by_name['UploadFile'] = _UPLOADFILE
-DESCRIPTOR.message_types_by_name['Request'] = _REQUEST
-DESCRIPTOR.message_types_by_name['Response'] = _RESPONSE
+DESCRIPTOR.message_types_by_name['DBRequest'] = _DBREQUEST
+DESCRIPTOR.message_types_by_name['DBResponse'] = _DBRESPONSE
+DESCRIPTOR.message_types_by_name['ProviderRequest'] = _PROVIDERREQUEST
+DESCRIPTOR.message_types_by_name['ProviderResponse'] = _PROVIDERRESPONSE
 
 String = _reflection.GeneratedProtocolMessageType('String', (_message.Message,),
     {
@@ -381,22 +439,28 @@ MobiusModel = _reflection.GeneratedProtocolMessageType('MobiusModel', (_message.
       # @@protoc_insertion_point(class_scope:base.MobiusModel)
     })
 
-UploadFile = _reflection.GeneratedProtocolMessageType('UploadFile', (_message.Message,),
+DBRequest = _reflection.GeneratedProtocolMessageType('DBRequest', (_message.Message,),
     {
-      'DESCRIPTOR': _UPLOADFILE,
-      # @@protoc_insertion_point(class_scope:base.UploadFile)
+      'DESCRIPTOR': _DBREQUEST,
+      # @@protoc_insertion_point(class_scope:base.DBRequest)
     })
 
-Request = _reflection.GeneratedProtocolMessageType('Request', (_message.Message,),
+DBResponse = _reflection.GeneratedProtocolMessageType('DBResponse', (_message.Message,),
     {
-      'DESCRIPTOR': _REQUEST,
-      # @@protoc_insertion_point(class_scope:base.Request)
+      'DESCRIPTOR': _DBRESPONSE,
+      # @@protoc_insertion_point(class_scope:base.DBResponse)
     })
 
-Response = _reflection.GeneratedProtocolMessageType('Response', (_message.Message,),
+ProviderRequest = _reflection.GeneratedProtocolMessageType('ProviderRequest', (_message.Message,),
     {
-      'DESCRIPTOR': _RESPONSE,
-      # @@protoc_insertion_point(class_scope:base.Response)
+      'DESCRIPTOR': _PROVIDERREQUEST,
+      # @@protoc_insertion_point(class_scope:base.ProviderRequest)
+    })
+
+ProviderResponse = _reflection.GeneratedProtocolMessageType('ProviderResponse', (_message.Message,),
+    {
+      'DESCRIPTOR': _PROVIDERRESPONSE,
+      # @@protoc_insertion_point(class_scope:base.ProviderResponse)
     })
 
 

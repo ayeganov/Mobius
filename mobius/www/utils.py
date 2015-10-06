@@ -193,7 +193,10 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
         while True:
             if self._receiving_data:
                 self._receiving_data, self._buffer = yield self._read_data(self._buffer)
-                if self._is_end_of_request(self._buffer) or self._is_end_of_data(self._buffer):
+                if self._is_end_of_request(self._buffer):
+                    self.request_done()
+                    break
+                elif self._is_end_of_data(self._buffer):
                     break
             else:
                 headers, self._buffer = yield self._read_headers(self._buffer)
@@ -225,4 +228,10 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
 
         @param headers - headers for the given data
         @param data - data to be processed
+        '''
+
+    @abc.abstractmethod
+    def request_done(self):
+        '''
+        End of the request - all of the fields, and data have been sent.
         '''
