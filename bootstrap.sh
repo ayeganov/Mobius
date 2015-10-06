@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-apt-get update
+# PostgreSQL requirement
+sudo apt-get update
 
 function install_google_proto_buf
 {
@@ -15,12 +16,14 @@ function install_google_proto_buf
 
     pushd python
     python3 setup.py build
-    python3 setup.py test
-    sudo python3 setup.py install
+    python3 setup.py test && sudo python3 setup.py install
 }
 
 # Install C++
 apt-get install -y g++ python-dev make git tig
+
+# Install postgres
+apt-get install -y postgresql-9.3 python-dev libpq-dev
 
 # Google protobuf dependencies
 apt-get install -y dh-autoreconf unzip
