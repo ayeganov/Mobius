@@ -4,24 +4,25 @@ from mobius.utils import Singleton
 
 STREAM_MAP =\
     {
-        "/upload/ready": dict(
-            send_type=msg_pb2.UploadFile
+        "/db/new_file": dict(
+            send_type=msg_pb2.DBRequest,
+            reply_type=msg_pb2.DBResponse
         ),
         "/mobius/model": dict(
             send_type=msg_pb2.MobiusModel
         ),
         "/request/local": dict(
-            send_type=msg_pb2.Request,
-            recv_type=msg_pb2.Response
+            send_type=msg_pb2.ProviderRequest,
+            reply_type=msg_pb2.ProviderResponse
         ),
         "/request/request": dict(
-            send_type=msg_pb2.Request,
+            send_type=msg_pb2.ProviderRequest,
         ),
         "/request/do_work": dict(
-            send_type=msg_pb2.Request,
+            send_type=msg_pb2.ProviderRequest,
         ),
         "/request/result": dict(
-            send_type=msg_pb2.Response,
+            send_type=msg_pb2.ProviderResponse,
         ),
     }
 
