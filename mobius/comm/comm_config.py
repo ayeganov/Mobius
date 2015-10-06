@@ -37,20 +37,20 @@ class StreamInfo:
     '''
     This class contains all of the necessary information to create a stream.
     '''
-    def __init__(self, name, send_type, recv_type=None):
+    def __init__(self, name, send_type, recv_type=None, reply_type=None):
         '''
         Initializes the instance of StreamInfo.
 
         @param name - name of this stream
         @param send_type - type of message to be sent over this stream
-        @param recv_type - type of message to receive in response.
+        @param recv_type - type of message to receive, if the channel will be
+                           used for listening only. (Subscriber case)
+        @param reply_type - type of message to receive in reply.
         '''
         self._name = name
         self._send_type = send_type
-        if recv_type is None:
-            self._recv_type = send_type
-        else:
-            self._recv_type = recv_type
+        self._recv_type = send_type if (recv_type is None) else recv_type
+        self._reply_type = send_type if (reply_type is None) else reply_type
 
     @property
     def name(self):
@@ -72,6 +72,13 @@ class StreamInfo:
         Message type that can be received in response over this stream.
         '''
         return self._recv_type
+
+    @property
+    def reply_type(self):
+        '''
+        Message type that can be received when waiting for a response over this stream.
+        '''
+        return self._reply_type
 
 
 class StreamMap(metaclass=Singleton):

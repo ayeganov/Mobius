@@ -92,6 +92,8 @@ class Stream:
     receive messages.
     '''
     SEPARATOR = b''
+    REPLY_CODE = b'REP'
+    RECV_CODE = b'RCV'
 
     def __init__(self, socket, stream_info, path, on_recv=None, on_send=None, loop=None):
         '''
@@ -100,11 +102,14 @@ class Stream:
         @param socket - zmq socket that has alredy been bound
         @param stream_info - this streams definition from the yaml config
         @param path - path to the socket on the disk
+        @parma on_recv - callback that processes received messages
+        @parma on_send - callback that processes sent messages
         @param loop - loop this socket will belong to. Default is global async loop.
         '''
         self._path = path
         self._recv_type = stream_info.recv_type
         self._send_type = stream_info.send_type
+        self._reply_type = stream_info.reply_type
         self._on_recv = on_recv
         self._on_send = on_send
 
@@ -114,6 +119,18 @@ class Stream:
             self._stream.on_recv(self._recv_wrapper)
         if self._on_send is not None:
             self._stream.on_send(self._send_wrapper)
+
+    @property
+    def recv_type(self):
+        return self._recv_type
+
+    @property
+    def send_type(self):
+        return self._send_type
+
+    @property
+    def reply_type(self):
+        return self._reply_type
 
     def on_send(self, callback):
         '''
@@ -180,12 +197,12 @@ class Stream:
         @param msg - Google protocol buffer msg to send over this stream
         @param kwds - extra keywords that zmq's stream send accepts.
         '''
-        if not isinstance(msg, self._send_type):
+        if not isinstance(msg, self.send_type):
             raise ValueError("Wrong message type being sent. {0} is not {1}"
                              .format(type(msg), type(self._send_type)))
 
         data = msg.SerializeToString()
-        msgs = [self.SEPARATOR, data]
+        msgs = [self.SEPARATOR, self.RECV_CODE, data]
         self._stream.send_multipart(msgs, **kwds)
 
     def reply(self, ids, msg, **kwds):
@@ -200,26 +217,34 @@ class Stream:
         @param msg - Google protocol buffer msg to send over this stream.
         @param kwds - extra keywords that zmq's stream send accepts.
         '''
-        if not isinstance(msg, self._send_type):
+        if not isinstance(msg, self.reply_type):
             raise ValueError("Wrong message type being sent. {0} is not {1}"
                              .format(type(msg), type(self._send_type)))
 
         data = msg.SerializeToString()
 
-        msgs = list(unroll_list([ids, self.SEPARATOR, data]))
-        log.info("Sending multipart: {0}".format(msgs))
+        msgs = list(unroll_list([ids, self.SEPARATOR, self.REPLY_CODE, data]))
         self._stream.send_multipart(msgs, **kwds)
 
-    @staticmethod
-    def _callback_wrapper(data, msg_type, callback):
+    def _get_msg_type(self, op_code):
+        '''
+        Given the op code determine what message type is expected.
+
+        @param op_code - op code indicating whether the message was sent as a
+                         reply, or a regular send.
+        @returns message type appropriate for the op code
+        '''
+        return self.recv_type if (op_code == Stream.RECV_CODE) else self.reply_type
+
+    def _callback_wrapper(self, data, callback):
         '''
         Helper method to parse serialized messages that are being sent and
         received for the respective callbacks.
 
         @param data - data to be sent/received
-        @param msg_type - type of message to parse
         @param callback - method to invoke
         '''
+        envelope = []
         msgs = []
         it = iter(data)
         # Get envelopes if any
@@ -227,7 +252,9 @@ class Stream:
             if d == Stream.SEPARATOR:
                 break
             else:
-                msgs.append(d)
+                envelope.append(d)
+        # Determine message type to parse
+        msg_type = self._get_msg_type(next(it))
         # Get actual GPB messages
         for d in it:
             msg = msg_type()
@@ -239,13 +266,13 @@ class Stream:
             msgs.append(msg)
 
         if msgs:
-            callback(msgs)
+            callback(envelope, msgs)
 
     def _recv_wrapper(self, data):
-        self._callback_wrapper(data, self._recv_type, self._on_recv)
+        self._callback_wrapper(data, self._on_recv)
 
     def _send_wrapper(self, data, _):
-        self._callback_wrapper(data, self._send_type, self._on_send)
+        self._callback_wrapper(data, self._on_send)
 
     def close(self):
         '''
@@ -419,8 +446,10 @@ class SocketFactory:
 
         @param chan_name - chan_name of this socket
         @param on_recv - callback when messages are received on this socket.
-                         It will be called as `on_recv([msg1,...,msgN])`
+                         It will be called as `on_recv([envelope], [msg1,...,msgN])`
                          If set to None - no data will be read from this socket.
+                         Envelope contains routing frames if the messages being
+                         received come through a proxy.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
         @param port - port number to connect to
@@ -445,8 +474,10 @@ class SocketFactory:
                          Status is either a positive value indicating
                          number of bytes sent, or -1 indicating an error.
         @param on_recv - callback when messages are received on this socket.
-                         It will be called as `on_recv([msg1,...,msgN])`
+                         It will be called as `on_recv([envelope], [msg1,...,msgN])`
                          If set to None - no data will be read from this socket.
+                         Envelope contains routing frames if the messages being
+                         received come through a proxy.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
         @param port - port number to connect to
@@ -470,8 +501,10 @@ class SocketFactory:
                          Status is either a positive value indicating
                          number of bytes sent, or -1 indicating an error.
         @param on_recv - callback when messages are received on this socket.
-                         It will be called as `on_recv([msg1,...,msgN])`
+                         It will be called as `on_recv([envelope], [msg1,...,msgN])`
                          If set to None - no data will be read from this socket.
+                         Envelope contains routing frames if the messages being
+                         received come through a proxy.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
         @param port - port number to connect to
@@ -495,9 +528,10 @@ class SocketFactory:
                          Status is either a positive value indicating
                          number of bytes sent, or -1 indicating an error.
         @param on_recv - callback when messages are received on this socket.
-                         It will be called as `on_recv([msg1,...,msgN])`
+                         It will be called as `on_recv([envelope], [msg1,...,msgN])`
                          If set to None - no data will be read from this socket.
-                         The first message will always be the ID of the sender.
+                         Envelope contains routing frames if the messages being
+                         received come through a proxy, or in this case a router socket.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
         @param port - port number to connect to
@@ -521,8 +555,10 @@ class SocketFactory:
                          Status is either a positive value indicating
                          number of bytes sent, or -1 indicating an error.
         @param on_recv - callback when messages are received on this socket.
-                         It will be called as `on_recv([msg1,...,msgN])`
+                         It will be called as `on_recv([envelope], [msg1,...,msgN])`
                          If set to None - no data will be read from this socket.
+                         Envelope contains routing frames if the messages being
+                         received come through a proxy.
         @param host - hostname, or ip address on which this socket will communicate
         @param transport - what kind of transport to use for messaging(inproc, ipc, tcp etc)
         @param port - port number to connect to
