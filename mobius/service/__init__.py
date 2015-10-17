@@ -1,6 +1,10 @@
 from .service import (
+                      AbstractCommand,
                       AbstractFactory,
                       BaseService,
                       Command,
-                      ICommand,
-                      ProviderFactory,)
+                      Parameter,
+                      ProviderFactory,
+                      ServiceError,
+                      UploadResponse,
+                      make_param_string)
