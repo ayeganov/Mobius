@@ -194,7 +194,7 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
             if self._receiving_data:
                 self._receiving_data, self._buffer = yield self._read_data(self._buffer)
                 if self._is_end_of_request(self._buffer):
-                    self.request_done()
+                    yield self.request_done()
                     break
                 elif self._is_end_of_data(self._buffer):
                     break
@@ -233,5 +233,5 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def request_done(self):
         '''
-        End of the request - all of the fields, and data have been sent.
+        End of the request - all of the fields, and data have been sent. This must be a coroutine.
         '''

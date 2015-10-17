@@ -2,6 +2,9 @@ import json
 import logging
 import tempfile
 
+import tornado.gen
+from tornado.concurrent import Future
+
 # Mobius
 from mobius.comm.msg_pb2 import DBRequest
 from mobius.comm.stream import SocketFactory
@@ -40,6 +43,8 @@ class StreamHandler(PostContentHandler):
         self._file_started = False
         self._user_file_name = None
         self._user_id = int(self.get_secure_cookie("user_id"))
+        self._upload_future = None
+        self._uploaded_model_id = None
 
     def _handle_response(self, envelope, msgs):
         '''
@@ -49,6 +54,7 @@ class StreamHandler(PostContentHandler):
         @param msgs - list of messages
         '''
         log.info("Got messages: {0}".format(str(msgs)))
+        self._upload_future.set_result(msgs[-1])
 
     def on_finish(self):
         '''
@@ -62,7 +68,12 @@ class StreamHandler(PostContentHandler):
         '''
         self.set_header("Content-Type", "text/plain")
         self.set_status(self.POST_SUCCESS)
-        self.write(json.dumps({"success": True}))
+        if self._uploaded_model_id is not None:
+            self.write(json.dumps({"success": True,
+                                  "model_id": self._uploaded_model_id}))
+        else:
+            self.write(json.dumps({"success": False,
+                                  "model_id": -1}))
         self.finish()
 
     def _write_file_data(self, headers, data):
@@ -107,11 +118,25 @@ class StreamHandler(PostContentHandler):
             self._process_form_field(self._cur_headers, chunk)
     receive_data.__doc__ = PostContentHandler.receive_data.__doc__
 
+    @tornado.gen.coroutine
     def request_done(self):
+        self._upload_future = Future()
         upload_file = DBRequest(command=Command.SAVE_FILE,
                                 path=self._tmp_file.name,
                                 filename=self._user_file_name,
                                 user_id=self._user_id)
         log.info("Sending upload file: {0}".format(str(upload_file)))
         self._upload_pub.send(upload_file)
+        yield self._upload_future
+
+        try:
+            result = self._upload_future.result()
+            if result.success:
+                log.debug("Successfully uploaded file {0}".format(self._user_file_name))
+                self._uploaded_model_id = result.model.id
+            else:
+                log.debug("Failed to upload file {0}".format(self._user_file_name))
+        except:
+            log.error("Error while uploading file: {0}".format(self._user_file_name))
+
     request_done.__doc__ = PostContentHandler.request_done.__doc__

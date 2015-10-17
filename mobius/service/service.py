@@ -1,4 +1,5 @@
 import abc
+import collections
 import enum
 import json
 import logging
@@ -9,9 +10,18 @@ from mobius.comm.msg_pb2 import ProviderResponse
 log = logging.getLogger(__name__)
 
 
+UploadResponse = collections.namedtuple('UploadResponse', ['provider_id', 'model_name'])
+
+
 class ServiceError(Exception):
     '''
     All service errors should use this exception type.
+    '''
+
+
+class ParamError(ServiceError):
+    '''
+    Error converting parameters.
     '''
 
 
@@ -24,17 +34,63 @@ class Command(enum.IntEnum):
     SAVE_FILE = 3
 
 
-class ICommand(metaclass=abc.ABCMeta):
+class Parameter(enum.IntEnum):
+    '''
+    Mobius parameter types.
+    '''
+    ID = 1
+    QUANTITY = 2
+    SCALE = 3
+    UNIT = 4
+    CURRENCY = 5
+    MATERIAL = 6
+
+    def __repr__(self):
+        return self.name
+
+
+def make_param_string(provider_map, params):
+    '''
+    Given the parameters dictionary containing keys and values.
+
+    @param provider_map - mapping of mobius params to provider params
+    @param params - parameters with accompanying values
+    @returns parameter string to be appended to the URL
+    '''
+    try:
+        params = ("=".join((provider_map[key], str(value))) for key, value in params.items())
+        param_string = "&".join(params)
+        return param_string
+    except KeyError as ke:
+        raise ParamError("Unable to convert parameter: {0}".format(ke.args[0]))
+
+
+class AbstractCommand(metaclass=abc.ABCMeta):
     """
     This is the interface that all commands must implement to work with mobius
     worker services.
     """
-    @abc.abstractmethod
     def __call__(self):
         """
         Execute this command. By the time this method is invoked command must
         contain all the necessary information for the execution to succeed.
         """
+        self.initialize()
+        return self.run()
+
+    @abc.abstractmethod
+    def initialize(self):
+        '''
+        This method will be called within the new process/thread, so all
+        resources must acquired here, especially if the command runs in a new
+        process.
+        '''
+
+    @abc.abstractmethod
+    def run(self):
+        '''
+        Execute the command.
+        '''
 
 
 class AbstractFactory(metaclass=abc.ABCMeta):
@@ -58,7 +114,7 @@ class AbstractFactory(metaclass=abc.ABCMeta):
 
         @param request - an instance of Request message defined in msg.proto
         @param context - context containing extra data to be passed to commands
-        @returns a concrete instance of ICommand interface
+        @returns a concrete instance of AbstractCommand interface
         '''
         try:
             return self.commands[request.command](request, context=context)

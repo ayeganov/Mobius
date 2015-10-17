@@ -51,7 +51,7 @@ message DBResponse
 message ProviderRequest
 {
     optional int32 command = 1;
-    optional string data    = 2;
+    optional string params = 2;
     optional MobiusModel model = 3;
 }
 
