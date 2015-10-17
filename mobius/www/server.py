@@ -1,5 +1,6 @@
 # Standard lib
 import argparse
+import json
 import logging
 import os
 import traceback
@@ -18,7 +19,7 @@ from mobius.db import db
 from mobius.comm import stream
 from mobius.comm.msg_pb2 import ProviderRequest, MobiusModel
 from mobius.comm.stream import SocketFactory
-from mobius.service import Command
+from mobius.service import Command, Parameter
 from mobius.utils import set_up_logging
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
@@ -62,7 +63,7 @@ class MainHandler(RequestHandler):
         self.render("index.html")
 
 
-class TestHandler(RequestHandler):
+class QuoteHandler(RequestHandler):
     '''
     Remove me.
     '''
@@ -73,7 +74,6 @@ class TestHandler(RequestHandler):
                                                            transport=stream.INPROC,
                                                            bind=False,
                                                            loop=loop)
-
         self._request_future = None
 
     def _process_result(self, envelope, msgs):
@@ -85,10 +85,62 @@ class TestHandler(RequestHandler):
     def get(self):
         log.info("Test handler get")
         self._request_future = Future()
-        model_id = self.get_argument("uuid", default="dummy")
+        model_id = int(self.get_argument("mobius_id", default=1))
 
-        mob_model = MobiusModel(id=43, user_id=3)
+        user_id = int(self.get_secure_cookie("user_id"))
+        mob_model = MobiusModel(id=model_id, user_id=user_id)
+        params = json.dumps({Parameter.QUANTITY.name: 1,
+                            Parameter.SCALE.name: 0.1,
+                            Parameter.UNIT.name: "cm"})
+#                            Parameter.MATERIAL.name: "metal_cast_silver_sanded"})
+
         request = ProviderRequest(command=Command.QUOTE.value,
+                                  params=params,
+                                  model=mob_model)
+        self._request_dealer.send(request)
+
+        log.info("Lets wait here one second.")
+        yield self._request_future
+        log.info("One second should have passed.")
+
+        response = self._request_future.result()
+        print("Type of response: {0}".format(type(response)))
+        if response.HasField("error"):
+            self.set_status(500)
+            self.write(response.error)
+        elif response.HasField("response"):
+            self.set_status(200)
+            self.write(response.response)
+        self._request_future = None
+
+
+class UploadToProvider(RequestHandler):
+    '''
+    Upload the file associated with the given mobius id to all providers.
+    '''
+    def initialize(self, loop):
+        self._loop = loop
+        self._request_dealer = SocketFactory.dealer_socket("/request/local",
+                                                           on_recv=self._process_result,
+                                                           transport=stream.INPROC,
+                                                           bind=False,
+                                                           loop=loop)
+        self._request_future = None
+
+    def _process_result(self, envelope, msgs):
+        response = msgs[-1]
+        log.info("Response: {0}".format(msgs))
+        self._request_future.set_result(response)
+
+    @gen.coroutine
+    def get(self):
+        log.info("UploadToProvider handler get")
+        self._request_future = Future()
+        model_id = int(self.get_argument("mobius_id", default=0))
+
+        user_id = int(self.get_secure_cookie("user_id"))
+        mob_model = MobiusModel(id=model_id, user_id=user_id)
+        request = ProviderRequest(command=Command.UPLOAD.value,
                                   model=mob_model)
         self._request_dealer.send(request)
 
@@ -164,7 +216,8 @@ def main():
                 # File upload handler
                 (r'/upload', upload.StreamHandler, {"loop": loop}),
 
-                (r'/test', TestHandler, {"loop": loop}),
+                (r'/quote', QuoteHandler, {"loop": loop}),
+                (r'/provider_upload', UploadToProvider, {"loop": loop}),
 
                 # Page handlers
                 (r"/", MainHandler, {"db_handle": db_handle}),
