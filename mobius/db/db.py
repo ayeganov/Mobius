@@ -1,8 +1,9 @@
 from contextlib import contextmanager
+import enum
 
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy import Sequence
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import BYTEA
@@ -15,15 +16,22 @@ from sqlalchemy.sql import func
 Base = declarative_base()
 
 
+class ProviderID(enum.IntEnum):
+    '''
+    This list all commands that services can understand, and execute.
+    '''
+    SCULPTEO = 1
+
+
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "users"
     id = Column(Integer, Sequence('user_id_seq'), primary_key=True)
     first_name = Column(String)
     last_name = Column(String)
     password = Column(String)
     date_created = Column(DateTime, default=func.now(), onupdate=func.current_timestamp())
 
-#    transactions = relationship("Transaction", backref="user")
+    transactions = relationship("Transaction")
 
     def __repr__(self):
         return "<User(fullname='{0} {1}', password='{2}', created='{3}')>".format(
@@ -37,11 +45,11 @@ class File(Base):
     name = Column(String)
     data = Column(BYTEA)
     user_id = Column(Integer, ForeignKey("users.id"))
-#    txn_id = Column(Integer, ForeignKey("transactions.id"))
     date_created = Column(DateTime, default=func.now(), onupdate=func.current_timestamp())
 
     user = relationship("User", backref=backref("files", order_by=id), foreign_keys=[user_id])
-#    transactions = relationship("Transaction", backref="file", foreign_keys=[txn_id])
+    transactions = relationship("Transaction")
+    provider_info = relationship("ProviderInfo", lazy="joined")
 
     def __repr__(self):
         return "<File (name={0})>".format(self.name)
@@ -54,6 +62,25 @@ class Transaction(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     file_id = Column(Integer, ForeignKey("files.id"))
     date_created = Column(DateTime, default=func.now(), onupdate=func.current_timestamp())
+
+
+class ProviderInfo(Base):
+    __tablename__ = "provider_infos"
+    __table_args__ = (UniqueConstraint("mobius_id", "remote_id", name="unique_id"),)
+
+    id = Column(Integer, Sequence("provider_info_seq"), primary_key=True)
+    provider_id = Column(Integer)
+    mobius_id = Column(Integer, ForeignKey("files.id"))
+    remote_id = Column(String)
+    date_created = Column(DateTime, default=func.now(), onupdate=func.current_timestamp())
+
+
+class Quote(Base):
+    __tablename__ = "quotes"
+
+    id = Column(Integer, Sequence("provider_info_seq"), primary_key=True)
+    txn_id = Column(Integer, ForeignKey("transactions.id"))
+    params = Column(String)
 
 
 class DBHandle:
