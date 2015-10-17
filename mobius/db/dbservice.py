@@ -7,7 +7,7 @@ import zmq.eventloop
 from mobius.comm.msg_pb2 import MobiusModel, DBResponse
 from mobius.comm.stream import SocketFactory
 from mobius.db import db
-from mobius.service import ICommand, AbstractFactory, BaseService, Command
+from mobius.service import AbstractCommand, AbstractFactory, BaseService, Command
 from mobius.utils import set_up_logging
 from mobius.utils import eventloop
 
@@ -27,7 +27,7 @@ class DBServiceError(Exception):
     '''
 
 
-class SaveFile(ICommand):
+class SaveFile(AbstractCommand):
     '''
     This command saves a file to the database.
     '''
@@ -43,9 +43,19 @@ class SaveFile(ICommand):
         self._path = path
         self._filename = filename
         self._user_id = user_id
+        # If ever decide to change SaveFile to run in a new process move
+        # db_handle initialization to initialize()
         self._db_handle = db_handle
 
-    def __call__(self):
+    def initialize(self):
+        '''
+        Nothing to do here.
+        '''
+
+    def run(self):
+        '''
+        Save the passed in file in the database.
+        '''
         with self._db_handle.session_scope() as session:
             with open(self._path, "rb") as f:
                 contents = f.read()
@@ -53,10 +63,12 @@ class SaveFile(ICommand):
 
             session.add(file_3d)
             session.commit()
-            log.debug("File saved, removing path: {0}".format(self._path))
-            os.remove(self._path)
+            log.debug("File saved, removing it: {0}".format(self._path))
+            try:
+                os.remove(self._path)
+            except OSError:
+                log.error("Unable to delete file: {0}".format(self._path))
             return file_3d.id
-    __call__.__doc__ == ICommand.__call__.__doc__
 
 
 class DBCommandFactory(AbstractFactory):
@@ -135,39 +147,6 @@ class DBService(BaseService):
         Database context must contain the handle to the database.
         '''
         return {"db_handle": self._db_handle}
-
-    def _get_user(self, session, user_id):
-        '''
-        Fetches the user object from the database.
-
-        @param session - database session
-        @param user_id - id of the user in question
-        @returns User instance
-        @raises DBServiceError if user doesn't exist
-        '''
-        user = session.query(db.User).filter_by(id=user_id).first()
-        if user is None:
-            raise DBServiceError("Non-existant user id: {0}".format(user_id))
-        return user
-
-    def _save_file_to_db(self, path, filename, user_id):
-        '''
-        Reads the file from the given path, and stores in the database.
-
-        @param path - file path
-        @param filename - name of the file given by user
-        @param user_id - id of the user who is uploading the file
-        '''
-        with self._db_handle.session_scope() as session:
-            user = self._get_user(session, user_id)
-            with open(path, "rb") as f:
-                contents = f.read()
-            file_3d = db.File(name=filename, data=contents)
-            user.files.append(file_3d)
-
-            session.add(user)
-            session.commit()
-            return file_3d.id
 
 
 def main():
