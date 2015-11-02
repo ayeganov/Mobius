@@ -53,7 +53,6 @@ class StreamHandler(PostContentHandler):
         @param envelope - a list of router socket ids
         @param msgs - list of messages
         '''
-        log.info("Got messages: {0}".format(str(msgs)))
         self._upload_future.set_result(msgs[-1])
 
     def on_finish(self):
