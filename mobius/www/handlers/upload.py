@@ -6,8 +6,8 @@ import tornado.gen
 from tornado.concurrent import Future
 
 # Mobius
-from mobius.comm.msg_pb2 import DBRequest
-from mobius.comm.stream import SocketFactory
+from mobius.comm.msg_pb2 import DBRequest, UploadProgress
+from mobius.comm.stream import SocketFactory, INPROC
 from mobius.service import Command
 from mobius.utils import get_tmp_dir
 from mobius.www.utils import PostContentHandler
@@ -39,12 +39,22 @@ class StreamHandler(PostContentHandler):
                                                        bind=False,
                                                        on_recv=self._handle_response,
                                                        loop=loop)
+        self._upload_progress_router = SocketFactory.router_socket("/mobius/upload_progress",
+                                                                   bind=False,
+                                                                   transport=INPROC,
+                                                                   on_recv=self._store_envelope,
+                                                                   loop=loop)
         self._cur_headers = None
         self._file_started = False
         self._user_file_name = None
         self._user_id = int(self.get_secure_cookie("user_id"))
         self._upload_future = None
         self._uploaded_model_id = None
+        self._envelope = None
+
+    def _store_envelope(self, envelope, _):
+        log.info("Saving envelope: {0}".format(envelope))
+        self._envelope = envelope
 
     def _handle_response(self, envelope, msgs):
         '''
@@ -109,6 +119,11 @@ class StreamHandler(PostContentHandler):
     def receive_data(self, headers, chunk):
         if self._cur_headers != headers:
             self._cur_headers = headers
+
+        print("Progress: {0}".format(self.progress))
+        if self._envelope:
+            progress = UploadProgress(progress=self.progress)
+            self._upload_progress_router.reply(self._envelope, progress)
 
         # Process different content types differently
         if self._get_field_name(self._cur_headers) == self.FILE_FIELD:

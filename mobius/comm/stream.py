@@ -218,8 +218,8 @@ class Stream:
         @param kwds - extra keywords that zmq's stream send accepts.
         '''
         if not isinstance(msg, self.reply_type):
-            raise ValueError("Wrong message type being sent. {0} is not {1}"
-                             .format(type(msg), type(self._send_type)))
+            raise ValueError("Wrong message type being replied. {0} is not {1}"
+                             .format(type(msg), type(self._reply_type)))
 
         data = msg.SerializeToString()
 

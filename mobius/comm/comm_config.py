@@ -11,6 +11,10 @@ STREAM_MAP =\
         "/mobius/model": dict(
             send_type=msg_pb2.MobiusModel
         ),
+        "/mobius/upload_progress": dict(
+            send_type=msg_pb2.UploadProgress,
+            reply_type=msg_pb2.UploadProgress
+        ),
         "/request/local": dict(
             send_type=msg_pb2.ProviderRequest,
             reply_type=msg_pb2.ProviderResponse

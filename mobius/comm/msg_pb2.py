@@ -36,7 +36,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='msg.proto',
   package='base',
-  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0f\n\x07user_id\x18\x02 \x01(\x05\"M\n\tDBRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x10\n\x08\x66ilename\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\x05\"N\n\nDBResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12 \n\x05model\x18\x02 \x01(\x0b\x32\x11.base.MobiusModel\x12\r\n\x05\x65rror\x18\x03 \x01(\t\"T\n\x0fProviderRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0e\n\x06params\x18\x02 \x01(\t\x12 \n\x05model\x18\x03 \x01(\x0b\x32\x11.base.MobiusModel\"I\n\x10ProviderResponse\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\x12\x10\n\x08response\x18\x02 \x01(\t\x12\r\n\x05\x65rror\x18\x03 \x01(\t'))
+  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0f\n\x07user_id\x18\x02 \x01(\x05\"\"\n\x0eUploadProgress\x12\x10\n\x08progress\x18\x01 \x01(\x05\"9\n\x10ProviderProgress\x12\x13\n\x0bprovider_id\x18\x01 \x01(\x05\x12\x10\n\x08progress\x18\x02 \x01(\x05\"M\n\tDBRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x10\n\x08\x66ilename\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\x05\"N\n\nDBResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12 \n\x05model\x18\x02 \x01(\x0b\x32\x11.base.MobiusModel\x12\r\n\x05\x65rror\x18\x03 \x01(\t\"T\n\x0fProviderRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0e\n\x06params\x18\x02 \x01(\t\x12 \n\x05model\x18\x03 \x01(\x0b\x32\x11.base.MobiusModel\"I\n\x10ProviderResponse\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\x12\x10\n\x08response\x18\x02 \x01(\t\x12\r\n\x05\x65rror\x18\x03 \x01(\t'))
 
 
 
@@ -216,6 +216,69 @@ _MOBIUSMODEL = _descriptor.Descriptor(
 )
 
 
+_UPLOADPROGRESS = _descriptor.Descriptor(
+  name='UploadProgress',
+  full_name='base.UploadProgress',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='progress', full_name='base.UploadProgress.progress', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=175,
+  serialized_end=209,
+)
+
+
+_PROVIDERPROGRESS = _descriptor.Descriptor(
+  name='ProviderProgress',
+  full_name='base.ProviderProgress',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='provider_id', full_name='base.ProviderProgress.provider_id', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='progress', full_name='base.ProviderProgress.progress', index=1,
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=211,
+  serialized_end=268,
+)
+
+
 _DBREQUEST = _descriptor.Descriptor(
   name='DBRequest',
   full_name='base.DBRequest',
@@ -260,8 +323,8 @@ _DBREQUEST = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=175,
-  serialized_end=252,
+  serialized_start=270,
+  serialized_end=347,
 )
 
 
@@ -302,8 +365,8 @@ _DBRESPONSE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=254,
-  serialized_end=332,
+  serialized_start=349,
+  serialized_end=427,
 )
 
 
@@ -344,8 +407,8 @@ _PROVIDERREQUEST = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=334,
-  serialized_end=418,
+  serialized_start=429,
+  serialized_end=513,
 )
 
 
@@ -386,8 +449,8 @@ _PROVIDERRESPONSE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=420,
-  serialized_end=493,
+  serialized_start=515,
+  serialized_end=588,
 )
 
 _DBRESPONSE.fields_by_name['model'].message_type = _MOBIUSMODEL
@@ -398,6 +461,8 @@ DESCRIPTOR.message_types_by_name['Bool'] = _BOOL
 DESCRIPTOR.message_types_by_name['Float'] = _FLOAT
 DESCRIPTOR.message_types_by_name['Double'] = _DOUBLE
 DESCRIPTOR.message_types_by_name['MobiusModel'] = _MOBIUSMODEL
+DESCRIPTOR.message_types_by_name['UploadProgress'] = _UPLOADPROGRESS
+DESCRIPTOR.message_types_by_name['ProviderProgress'] = _PROVIDERPROGRESS
 DESCRIPTOR.message_types_by_name['DBRequest'] = _DBREQUEST
 DESCRIPTOR.message_types_by_name['DBResponse'] = _DBRESPONSE
 DESCRIPTOR.message_types_by_name['ProviderRequest'] = _PROVIDERREQUEST
@@ -437,6 +502,18 @@ MobiusModel = _reflection.GeneratedProtocolMessageType('MobiusModel', (_message.
     {
       'DESCRIPTOR': _MOBIUSMODEL,
       # @@protoc_insertion_point(class_scope:base.MobiusModel)
+    })
+
+UploadProgress = _reflection.GeneratedProtocolMessageType('UploadProgress', (_message.Message,),
+    {
+      'DESCRIPTOR': _UPLOADPROGRESS,
+      # @@protoc_insertion_point(class_scope:base.UploadProgress)
+    })
+
+ProviderProgress = _reflection.GeneratedProtocolMessageType('ProviderProgress', (_message.Message,),
+    {
+      'DESCRIPTOR': _PROVIDERPROGRESS,
+      # @@protoc_insertion_point(class_scope:base.ProviderProgress)
     })
 
 DBRequest = _reflection.GeneratedProtocolMessageType('DBRequest', (_message.Message,),

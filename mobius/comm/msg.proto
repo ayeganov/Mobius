@@ -33,6 +33,17 @@ message MobiusModel
     optional int32 user_id = 2;
 }
 
+message UploadProgress
+{
+    optional int32 progress = 1;
+}
+
+message ProviderProgress
+{
+    optional int32 provider_id = 1;
+    optional int32 progress = 2;
+}
+
 message DBRequest
 {
     optional int32 command = 1;

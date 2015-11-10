@@ -1,9 +1,11 @@
 # Standard lib
 import argparse
+import base64
 import json
 import logging
 import os
 import traceback
+import uuid
 
 
 # 3rd party
@@ -14,6 +16,7 @@ from tornado.httpserver import HTTPServer
 from tornado.web import (RequestHandler,
                          Application,
                          StaticFileHandler)
+import tornado.websocket
 
 from mobius.db import db
 from mobius.comm import stream
@@ -23,6 +26,7 @@ from mobius.service import Command, Parameter
 from mobius.utils import set_up_logging
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
+from mobius.www.websocks import UploadProgressWS
 
 
 log = logging.getLogger(__name__)
@@ -159,6 +163,30 @@ class UploadToProvider(RequestHandler):
         self._request_future = None
 
 
+class TestWebSocket(tornado.websocket.WebSocketHandler):
+    '''
+    First web socket to flesh out the initial design thoughts.
+    '''
+    def on_open(self):
+        '''
+        New web socket opened - self will be a new instance of TestWebSocket
+        connected to its own client.
+        '''
+        log.info("New websocket connected: {0}".format(self))
+        self.write_message("You are connected.")
+
+    def on_message(self, message):
+        '''
+        This socket received a message.
+        '''
+        log.info("Got a message: {0}".format(message))
+        loop = eventloop.IOLoop.instance()
+        loop.call_later(1, lambda: self.write_message("hello"))
+
+    def on_close(self):
+        log.info("Web socket closing...")
+
+
 def main():
     '''
     Main routine, what more do you want?
@@ -200,14 +228,14 @@ def main():
                                                loop=loop)
 
         settings = {
-            "cookie_secret": "lkjasdflkjblkjq/DKkjfk394823kfjdf/aklsdjf="
+            "cookie_secret": base64.encodebytes(uuid.uuid4().bytes + uuid.uuid4().bytes)
         }
 
         db_url = "postgresql://{usr}:{pswd}@{host}/{db}".format(usr=username,
                                                                 pswd=authentication,
                                                                 host=host,
                                                                 db=dbname)
-        db_handle = db.DBHandle(db_url, True)
+        db_handle = db.DBHandle(db_url, verbose=True)
         app = Application(
             [
                 # Static file handlers
@@ -219,6 +247,8 @@ def main():
                 (r'/quote', QuoteHandler, {"loop": loop}),
                 (r'/provider_upload', UploadToProvider, {"loop": loop}),
 
+                (r'/ws/upload_progress', UploadProgressWS),
+
                 # Page handlers
                 (r"/", MainHandler, {"db_handle": db_handle}),
             ],
@@ -227,6 +257,7 @@ def main():
             debug=True,
             **settings
         )
+        app.loop = loop
 
         server = HTTPServer(app, max_body_size=get_max_request_buffer())
 

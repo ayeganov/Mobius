@@ -10,6 +10,8 @@
         href="//ajax.googleapis.com/ajax/libs/dojo/1.10.1/dijit/themes/claro/claro.css"
         rel="stylesheet" type="text/css" />
         <script src="//ajax.googleapis.com/ajax/libs/dojo/1.10.1/dojo/dojo.js"></script-->
+        <script type="text/javascript" src={{ static_url("underscore/underscore-min.js") }}></script>
+        <script type="text/javascript" src={{ static_url("js/main/main.js") }}></script>
     </head>
     <body class="claro" style="height:500px;widht:100%;">
       <div data-dojo-type="dijit/layout/BorderContainer"
@@ -34,20 +36,28 @@
             </div>
           </div>
         </div>
-        <div data-dojo-type="dijit/layout/ContentPane"
-             data-dojo-props="region: 'center'">
-          <div data-dojo-type="dijit/Editor"></div>
-        </div>
 
         <!--p><h1>Select & Upload</h1></p-->
         <form data-dojo-type="dijit/form/Form" enctype="multipart/form-data" action="/upload" method="post"
               data-dojo-props="region: 'bottom'">
-            File: <input type="file" name="fileID" accept=".stl,.obj,application/octet-stream"/>
+
+            <script type="dojo/on" data-dojo-event="submit">
+                var result = false;
+                if(this.validate()){
+                    result = confirm('Form is valid, press OK to submit');
+                }else{
+                    alert('Form contains invalid data.  Please correct first');
+                    return false;
+                }
+                return result;
+            </script>
+
+            File: <input type="file" name="fileID" accept="*.stl,*.obj"/>
             Name: <input type="text" name="fileName" />
             <br />
             <br />
             <input type="submit" value="upload" />
-        </form> 
+        </form>
 
         <script>
             require(["dojo/parser"], function(parser){
