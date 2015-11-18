@@ -9,16 +9,18 @@ import requests
 from sqlalchemy.orm.exc import MultipleResultsFound
 from zmq.eventloop import IOLoop
 
+from mobius.comm import SocketFactory
 from mobius.db import db
 from mobius.db import ProviderID
 from mobius.service import (
-                            AbstractCommand,
-                            BaseService,
-                            Parameter,
-                            ProviderFactory,
-                            ServiceError,
-                            UploadResponse,
-                            make_param_string)
+    AbstractCommand,
+    BaseService,
+    Parameter,
+    ProgressBytesIO,
+    ProviderFactory,
+    ServiceError,
+    UploadResponse,
+    make_param_string)
 from mobius.utils import set_up_logging
 
 
@@ -36,12 +38,12 @@ host = "localhost"
 
 
 SCULPTEO_PARAM_MAP = {
-                    Parameter.ID.name: "uuid",
-                    Parameter.QUANTITY.name: "quantity",
-                    Parameter.SCALE.name: "scale",
-                    Parameter.UNIT.name: "unit",
-                    Parameter.CURRENCY.name: "currency",
-                    Parameter.MATERIAL.name: "productname"}
+    Parameter.ID.name: "uuid",
+    Parameter.QUANTITY.name: "quantity",
+    Parameter.SCALE.name: "scale",
+    Parameter.UNIT.name: "unit",
+    Parameter.CURRENCY.name: "currency",
+    Parameter.MATERIAL.name: "productname"}
 
 
 class QuoteCommand(AbstractCommand):
@@ -213,7 +215,7 @@ class UploadCommand(AbstractCommand):
             dimy:   dimension of the axis-aligned bounding box along the Y dimension in model units
             dimz:   dimension of the axis-aligned bounding box along the Z dimension in model units
         '''
-        file_handle = io.BytesIO(mob_file.data)
+        file_handle = ProgressBytesIO(mob_file.data)
 
         headers = {"X-Requested-With": "XMLHttpRequest"}
         files = {"file": ("mobius_file.stl", file_handle)}

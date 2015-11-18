@@ -26,7 +26,7 @@ from mobius.service import Command, Parameter
 from mobius.utils import set_up_logging
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
-from mobius.www.websocks import UploadProgressWS
+from mobius.www.websocks import UploadProgressWS, ProviderUploadProgressWS
 
 
 log = logging.getLogger(__name__)
@@ -173,6 +173,7 @@ class TestWebSocket(tornado.websocket.WebSocketHandler):
         connected to its own client.
         '''
         log.info("New websocket connected: {0}".format(self))
+
         self.write_message("You are connected.")
 
     def on_message(self, message):
@@ -248,6 +249,7 @@ def main():
                 (r'/provider_upload', UploadToProvider, {"loop": loop}),
 
                 (r'/ws/upload_progress', UploadProgressWS),
+                (r'/ws/provider_upload_progress', ProviderUploadProgressWS),
 
                 # Page handlers
                 (r"/", MainHandler, {"db_handle": db_handle}),
@@ -258,6 +260,7 @@ def main():
             **settings
         )
         app.loop = loop
+        app.web_socks = {}
 
         server = HTTPServer(app, max_body_size=get_max_request_buffer())
 

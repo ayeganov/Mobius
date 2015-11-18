@@ -41,17 +41,6 @@
         <form data-dojo-type="dijit/form/Form" enctype="multipart/form-data" action="/upload" method="post"
               data-dojo-props="region: 'bottom'">
 
-            <script type="dojo/on" data-dojo-event="submit">
-                var result = false;
-                if(this.validate()){
-                    result = confirm('Form is valid, press OK to submit');
-                }else{
-                    alert('Form contains invalid data.  Please correct first');
-                    return false;
-                }
-                return result;
-            </script>
-
             File: <input type="file" name="fileID" accept="*.stl,*.obj"/>
             Name: <input type="text" name="fileName" />
             <br />

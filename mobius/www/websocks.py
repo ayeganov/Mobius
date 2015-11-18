@@ -2,9 +2,7 @@ import logging
 
 import tornado.websocket
 
-from mobius.comm.stream import SocketFactory, INPROC
-from mobius.comm.msg_pb2 import UploadProgress
-
+from mobius.comm.stream import SocketFactory
 
 log = logging.getLogger(__name__)
 
@@ -15,17 +13,11 @@ class UploadProgressWS(tornado.websocket.WebSocketHandler):
     '''
     def open(self):
         '''
-        New web socket opened - self will be a new instance of TestWebSocket
+        New web socket opened - self will be a new instance of UploadProgressWS
         connected to its own client.
         '''
-        log.info("New websocket connected: {0}".format(self))
-        self._upload_progress = SocketFactory.router_socket("/mobius/upload_progress",
-                                                            on_recv=self._recv_progress,
-                                                            transport=INPROC,
-                                                            bind=True,
-                                                            loop=self.application.loop)
-        up_prog = UploadProgress(progress=0)
-        self._upload_progress.send(up_prog)
+        user_id = self.get_secure_cookie("user_id")
+        self.application.web_socks[user_id] = self
 
     def on_message(self, message):
         '''
@@ -35,18 +27,35 @@ class UploadProgressWS(tornado.websocket.WebSocketHandler):
         '''
         log.warning("Unexpected message: {0}".format(message))
 
-    def on_close(self):
+    def send_progress(self, progress):
         '''
-        This socket has been closed by the client.
-        '''
-        log.info("Web socket closing...")
-        self._upload_progress.close()
+        Send progress message to the client.
 
-    def _recv_progress(self, envelope, msgs):
+        @params progress - progress message
         '''
-        Receive progress messages, and pass them along to the user.
+        self.write_message(dict(progress=progress))
 
-        @params msgs - progress message
+
+class ProviderUploadProgressWS(tornado.websocket.WebSocketHandler):
+    '''
+    WebSocket to report providers file upload progress.
+    '''
+    def open(self):
         '''
-        progress = msgs[-1]
-        self.write_message(dict(progress=progress.progress))
+        Creates new instance of ProviderUploadProgressWS.
+        '''
+        self._progress_sub = SocketFactory.sub_socket("/mobius/upload_progress",
+                                                      on_recv=self._send_progress,
+                                                      bind=True,
+                                                      loop=self.application.loop)
+
+    def _send_progress(self, envelope, msgs):
+        '''
+        Send received progress message to the client.
+
+        @param envelope - envelope frames, will be filled with byte array if
+                          they apply to this communication
+        @param msgs - a list of received messages.
+        '''
+        msg = msgs[-1]
+        self.write_message(dict(provider=msg.provider_id, progress=msg.progress))

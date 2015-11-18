@@ -1,6 +1,7 @@
 import abc
 import collections
 import enum
+import io
 import json
 import logging
 
@@ -82,7 +83,7 @@ class AbstractCommand(metaclass=abc.ABCMeta):
     def initialize(self):
         '''
         This method will be called within the new process/thread, so all
-        resources must acquired here, especially if the command runs in a new
+        resources must be acquired here, especially if the command runs in a new
         process.
         '''
 
@@ -125,7 +126,11 @@ class AbstractFactory(metaclass=abc.ABCMeta):
 
 class ProviderFactory(AbstractFactory):
     '''
-    This factory knows how to make commands for 3D providers.
+    This factory knows how to make commands for 3D providers. Look at Command
+    for a list of commands. Currently supported commands:
+
+        make_upload_command
+        make_quote_command
     '''
     def __init__(self):
         '''
@@ -303,3 +308,40 @@ class BaseService(IService):
 
     def start(self):
         self._loop.start()
+
+
+class ProgressBytesIO(io.BytesIO):
+    '''
+    This class is used for tracking the progress of the file being read when
+    uploading it to a service provider.
+    '''
+    def __init__(self, data, progress_cb):
+        '''
+        Initialize instance of ProgressBytesIO.
+
+        @param data - byte array of data to be streamed as bytes objects.
+        @param progress_cb - callback to be invoked whenever a read occurs. Its signature:
+                             progress_cb(num_chars_read, total_buffer_size)
+        '''
+        super(ProgressBytesIO, self).__init__(data)
+        self._progress_cb = progress_cb
+        self._total_size = len(data)
+        self._progress = 0
+
+    def read(self, size):
+        '''
+        Override of the read method in BytesIO to count the bytes read.
+
+        @param size - number of bytes requested to be read.
+        '''
+        chars_read = super(ProgressBytesIO, self).read(size)
+        self._progress += len(chars_read)
+
+        if self._progress_cb is not None and callable(self._progress_cb):
+            try:
+                self._progress_cb(self._progress, self._total_size)
+            except Exception as e:
+                log.exception(e)
+                raise
+
+        return chars_read
