@@ -281,6 +281,26 @@ class Stream:
         self._stream.close()
 
 
+class Socket:
+    '''
+    A wrapper around a zmq socket for serial communications, not involving the
+    IOLoop. It is IPC only, and is intended to facilitate communications from
+    the service worker processes to the parent service.
+    '''
+    def __init__(self, chan_name, bind=True):
+        '''
+        Initialize this socket.
+
+        @param chan_name - name of the channel this channel will communicate on
+        @param bind - does this socket bind, or connect
+        '''
+        chan_name = chan_name.rstrip("/")
+        stream_info = comm_config.StreamMap().get_stream_info(chan_name)
+
+        ctx = zmq.Context()
+        self._pub_sock = ctx.socket(zmq.PUB)
+
+
 class RouterPubSubProxy:
     '''
     This is a proxy that has one front end socket, and two backend sockets. The
@@ -408,7 +428,7 @@ class SocketFactory:
         else:
             socket.connect(zmq_address.zmq_url())
 
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
+        stream_info = comm_config.StreamMap().get_stream_info(chan_name)
 
         stream = Stream(socket,
                         stream_info,

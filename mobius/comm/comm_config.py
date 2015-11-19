@@ -28,6 +28,11 @@ STREAM_MAP =\
         "/request/result": dict(
             send_type=msg_pb2.ProviderResponse,
         ),
+        "dynamic": {
+            "/worker/state/*": dict(
+                send_type=msg_pb2.WorkerState,
+            )
+        }
     }
 
 
@@ -80,7 +85,8 @@ class StreamInfo:
     @property
     def reply_type(self):
         '''
-        Message type that can be received when waiting for a response over this stream.
+        Message type that can be received when waiting for a response over this
+        stream.
         '''
         return self._reply_type
 
@@ -94,7 +100,8 @@ class StreamMap(metaclass=Singleton):
         Initializes the instance of StreamMap.
         '''
         self._stream_infos = {name: self._create_stream_info(name, msg)
-                              for name, msg in STREAM_MAP.items()}
+                              for name, msg in STREAM_MAP.items()
+                              if name != "dynamic"}
 
     def _create_stream_info(self, chan_name, params):
         '''
@@ -106,12 +113,28 @@ class StreamMap(metaclass=Singleton):
         stream_info = StreamInfo(chan_name, **params)
         return stream_info
 
-    def get_stream_name(self, chan_name):
+    def _get_dynamic_info(self, chan_name):
+        '''
+        Look up a dynamic info stream.
+
+        @param chan_name - name of the channel
+        @return StreamInfo associated with the given channel name, or raises an
+                exception
+        '''
+        dynamics = STREAM_MAP["dynamic"]
+        end_idx = chan_name.rfind("/") + 1
+        dynamic_name = chan_name[:end_idx] + "*"
+
+        params = dynamics[dynamic_name]
+        
+
+    def get_stream_info(self, chan_name):
         '''
         Look up the stream info associated with the given channel name
 
         @param chan_name - name of the channel
-        @return StreamInfo associated with the given channel name, or None
+        @return StreamInfo associated with the given channel name, or raises an
+                exception
         '''
         try:
             return self._stream_infos[chan_name]

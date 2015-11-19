@@ -73,4 +73,16 @@ message ProviderResponse
     optional string error = 3;
 }
 
+
+enum StateId
+{
+    UPLOAD_PROGRESS = 1;
+}
+
+message WorkerState
+{
+    optional StateId id = 1;
+    optional int32 progress = 2;
+}
+
 // vim: set ts=4 sw=4:

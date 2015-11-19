@@ -93,6 +93,19 @@ class AbstractCommand(metaclass=abc.ABCMeta):
         Execute the command.
         '''
 
+import zmq
+class MobiusCommand(AbstractCommand):
+    '''
+    Mobius command can communicate back to the service that spawned it.
+    '''
+    def initialize(self):
+        '''
+        Initialize MobiusCommand - this method creates a zmq socket to talk
+        back to the parent process.
+        '''
+        ctx = zmq.Context()
+        self._pub_sock = ctx.Socket(zmq.PUB)
+
 
 class AbstractFactory(metaclass=abc.ABCMeta):
     '''
@@ -323,7 +336,7 @@ class ProgressBytesIO(io.BytesIO):
         @param progress_cb - callback to be invoked whenever a read occurs. Its signature:
                              progress_cb(num_chars_read, total_buffer_size)
         '''
-        super(ProgressBytesIO, self).__init__(data)
+        super().__init__(data)
         self._progress_cb = progress_cb
         self._total_size = len(data)
         self._progress = 0
@@ -334,7 +347,7 @@ class ProgressBytesIO(io.BytesIO):
 
         @param size - number of bytes requested to be read.
         '''
-        chars_read = super(ProgressBytesIO, self).read(size)
+        chars_read = super().read(size)
         self._progress += len(chars_read)
 
         if self._progress_cb is not None and callable(self._progress_cb):
