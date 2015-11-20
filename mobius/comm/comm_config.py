@@ -1,3 +1,5 @@
+import re
+
 from mobius.comm import msg_pb2
 from mobius.utils import Singleton
 
@@ -29,7 +31,7 @@ STREAM_MAP =\
             send_type=msg_pb2.ProviderResponse,
         ),
         "dynamic": {
-            "/worker/state/*": dict(
+            "/worker/state/(.+)": dict(
                 send_type=msg_pb2.WorkerState,
             )
         }
@@ -102,6 +104,9 @@ class StreamMap(metaclass=Singleton):
         self._stream_infos = {name: self._create_stream_info(name, msg)
                               for name, msg in STREAM_MAP.items()
                               if name != "dynamic"}
+        dynamic = STREAM_MAP["dynamic"]
+        dynamic = {re.compile(name): params for name, params in STREAM_MAP.items()}
+        STREAM_MAP["dynamic"] = dynamic
 
     def _create_stream_info(self, chan_name, params):
         '''
@@ -122,11 +127,10 @@ class StreamMap(metaclass=Singleton):
                 exception
         '''
         dynamics = STREAM_MAP["dynamic"]
-        end_idx = chan_name.rfind("/") + 1
-        dynamic_name = chan_name[:end_idx] + "*"
-
-        params = dynamics[dynamic_name]
-        
+        for name, params for STREAM_MAP.items():
+            match = name.match(chan_name)
+            if match is not None:
+                return self._create_stream_info(chan_name, **params)
 
     def get_stream_info(self, chan_name):
         '''
@@ -137,6 +141,6 @@ class StreamMap(metaclass=Singleton):
                 exception
         '''
         try:
-            return self._stream_infos[chan_name]
+            return self._stream_infos.get(chan_name, None) or self._get_dynamic_info(chan_name)
         except KeyError:
             raise StreamConfigError("Channel '{0}' doesn't exist.".format(chan_name))

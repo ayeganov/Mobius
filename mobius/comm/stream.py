@@ -421,14 +421,13 @@ class SocketFactory:
         Helper method to create streams.
         '''
         chan_name = chan_name.rstrip("/")
+        stream_info = comm_config.StreamMap().get_stream_info(chan_name)
         zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
 
         if bind:
             socket.bind(zmq_address.zmq_url())
         else:
             socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_info(chan_name)
 
         stream = Stream(socket,
                         stream_info,
