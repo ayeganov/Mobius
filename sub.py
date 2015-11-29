@@ -1,20 +1,21 @@
-from tornado import ioloop
-from zmq import eventloop
+import zmq
 
-from mobius.comm.stream import SocketFactory
-
-eventloop.ioloop.install()
-
-loop = ioloop.IOLoop.instance()
+from mobius.comm.msg_pb2 import WorkerState
 
 
-def msg_received(msg):
-    print("Message received: {0}".format(msg[0].path))
+ctx = zmq.Context.instance()
+sock = ctx.socket(zmq.SUB)
+sock.setsockopt(zmq.SUBSCRIBE, b"")
 
-sub = SocketFactory.sub_socket("/upload/ready/", on_recv=msg_received, loop=loop)
-print("Address of zmq socket: {0}".format(sub._path))
+sock.bind("ipc:///run/shm/worker_state_Test")
+
 
 try:
-    loop.start()
+    print("Waiting for data on {}...".format("ipc:///run/shm/worker_state_Test"))
+    while True:
+        msg = sock.recv_multipart()[-1]
+#        ws = WorkerState()
+#        ws.ParseFromString(msg)
+        print("Got {}".format(msg))
 except (KeyboardInterrupt, SystemExit):
     print("Exiting due to system interrupt...")
