@@ -15,6 +15,10 @@ TCP = "tcp"
 PGM = "pgm"
 EPGM = "epgm"
 
+SEPARATOR = b''
+REPLY_CODE = b'REP'
+RECV_CODE = b'RCV'
+
 
 def unroll_list(item_list):
     '''
@@ -91,10 +95,6 @@ class Stream:
     This is the main class that interacts with the zmq library to send, and
     receive messages.
     '''
-    SEPARATOR = b''
-    REPLY_CODE = b'REP'
-    RECV_CODE = b'RCV'
-
     def __init__(self, socket, stream_info, path, on_recv=None, on_send=None, loop=None):
         '''
         Initializes instance of Stream.
@@ -202,7 +202,7 @@ class Stream:
                              .format(type(msg), type(self._send_type)))
 
         data = msg.SerializeToString()
-        msgs = [self.SEPARATOR, self.RECV_CODE, data]
+        msgs = [SEPARATOR, RECV_CODE, data]
         self._stream.send_multipart(msgs, **kwds)
 
     def reply(self, ids, msg, **kwds):
@@ -218,12 +218,12 @@ class Stream:
         @param kwds - extra keywords that zmq's stream send accepts.
         '''
         if not isinstance(msg, self.reply_type):
-            raise ValueError("Wrong message type being sent. {0} is not {1}"
-                             .format(type(msg), type(self._send_type)))
+            raise ValueError("Wrong message type being replied. {0} is not {1}"
+                             .format(type(msg), type(self._reply_type)))
 
         data = msg.SerializeToString()
 
-        msgs = list(unroll_list([ids, self.SEPARATOR, self.REPLY_CODE, data]))
+        msgs = list(unroll_list([ids, SEPARATOR, REPLY_CODE, data]))
         self._stream.send_multipart(msgs, **kwds)
 
     def _get_msg_type(self, op_code):
@@ -234,7 +234,7 @@ class Stream:
                          reply, or a regular send.
         @returns message type appropriate for the op code
         '''
-        return self.recv_type if (op_code == Stream.RECV_CODE) else self.reply_type
+        return self.recv_type if (op_code == RECV_CODE) else self.reply_type
 
     def _callback_wrapper(self, data, callback):
         '''
@@ -249,7 +249,7 @@ class Stream:
         it = iter(data)
         # Get envelopes if any
         for d in it:
-            if d == Stream.SEPARATOR:
+            if d == SEPARATOR:
                 break
             else:
                 envelope.append(d)
@@ -279,6 +279,110 @@ class Stream:
         Close this stream.
         '''
         self._stream.close()
+
+
+class Socket:
+    '''
+    A wrapper around a zmq socket for serial communications, not involving the
+    IOLoop. It is IPC only, and is intended to facilitate communications from
+    the service worker processes to the parent service.
+    '''
+    def __init__(self, chan_name, sock_type, bind=True):
+        '''
+        Initialize this socket.
+
+        @param chan_name - name of the channel this channel will communicate on
+        @param sock_type - what type of socket is this suppose to be. (zmq.PUB etc)
+        @param bind - does this socket bind, or connect
+        '''
+        chan_name = chan_name.rstrip("/")
+        # TODO: Move ZmqAddress to stream info
+        self._stream_info = comm_config.StreamMap().get_stream_info(chan_name)
+        zmq_address = ZmqAddress(chan_name=chan_name)
+
+        ctx = zmq.Context.instance()
+        self._sock = ctx.socket(sock_type)
+
+        if sock_type == zmq.SUB:
+            self._sock.setsockopt(zmq.SUBSCRIBE, b'')
+
+        if bind:
+            self._sock.bind(zmq_address.zmq_url())
+        else:
+            self._sock.connect(zmq_address.zmq_url())
+        self._zmq_url = zmq_address.zmq_url()
+
+    def send(self, msg):
+        '''
+        Send a GPB message on this socket.
+
+        @param msg - GPB message as defined in stream info
+        '''
+        if not isinstance(msg, self._stream_info.send_type):
+            raise ValueError("Wrong message type being sent. {0} is not {1}"
+                             .format(type(msg), type(self._stream_info.send_type)))
+
+        data = msg.SerializeToString()
+        msgs = [SEPARATOR, RECV_CODE, data]
+        self._sock.send_multipart(msgs)
+
+    def reply(self, envelope, msg, **kwds):
+        '''
+        Reply with the given message on this stream. The reply will be routed
+        back to the initial socket, based on the given list of ids in envelope,
+        if the stream being replied to is the routing proxy. The message type
+        must match that specified in the streams config, or a ValueError will
+        be raised.
+
+        @param envelope - a list of socket ids to reply to
+        @param msg - Google protocol buffer msg to send over this stream.
+        @param kwds - extra keywords that zmq's socket send accepts.
+        '''
+        if not isinstance(msg, self._stream_info.reply_type):
+            raise ValueError("Wrong message type being replied. {0} is not {1}"
+                             .format(type(msg), type(self._stream_info.reply_type)))
+
+        data = msg.SerializeToString()
+
+        msgs = list(unroll_list([envelope, SEPARATOR, REPLY_CODE, data]))
+        self._sock.send_multipart(msgs, **kwds)
+
+    def _get_msg_type(self, op_code):
+        '''
+        Given the op code determine what message type is expected.
+
+        @param op_code - op code indicating whether the message was sent as a
+                         reply, or a regular send.
+        @returns message type appropriate for the op code
+        '''
+        return (self._stream_info.recv_type
+                if (op_code == RECV_CODE)
+                else self._stream_info.reply_type)
+
+    def recv(self):
+        data = self._sock.recv_multipart()
+        envelope = []
+        msgs = []
+        it = iter(data)
+        # Get envelopes if any
+        for d in it:
+            if d == SEPARATOR:
+                break
+            else:
+                envelope.append(d)
+        # Determine message type to parse
+        msg_type = self._get_msg_type(next(it))
+        # Get actual GPB messages
+        for d in it:
+            msg = msg_type()
+            try:
+                msg.ParseFromString(d)
+            except:
+                log.exception("Unable to parse the protocol buffer message.")
+                continue
+            msgs.append(msg)
+
+        return (envelope, msgs)
 
 
 class RouterPubSubProxy:
@@ -371,8 +475,8 @@ class LocalRequestProxy:
         self._back_end.connect(back_address.zmq_url())
 
         def callback(from_name, to_name, zmq_stream, msgs):
-            log.info("Routing from {0} to {1} messages {2}"
-                     .format(from_name, to_name, msgs))
+            log.debug("Routing from {0} to {1} messages {2}"
+                      .format(from_name, to_name, msgs))
             zmq_stream.send_multipart(msgs)
             zmq_stream.flush()
 
@@ -384,7 +488,7 @@ class LocalRequestProxy:
 
 class SocketFactory:
     '''
-    Convenience class for creating different types of zmq sockets.
+    Convenience class for creating different types of zmq socket streams.
     '''
 
     @staticmethod
@@ -401,14 +505,13 @@ class SocketFactory:
         Helper method to create streams.
         '''
         chan_name = chan_name.rstrip("/")
+        stream_info = comm_config.StreamMap().get_stream_info(chan_name)
         zmq_address = ZmqAddress(transport=transport, host=host, chan_name=chan_name, port=port)
 
         if bind:
             socket.bind(zmq_address.zmq_url())
         else:
             socket.connect(zmq_address.zmq_url())
-
-        stream_info = comm_config.StreamMap().get_stream_name(chan_name)
 
         stream = Stream(socket,
                         stream_info,
@@ -568,5 +671,12 @@ class SocketFactory:
         '''
         context = zmq.Context.instance()
         socket = context.socket(zmq.DEALER)
+
+        return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)
+
+    @staticmethod
+    def pair_socket(chan_name, on_send=None, on_recv=None, host=None, transport=IPC, port=None, bind=True, loop=None):
+        context = zmq.Context.instance()
+        socket = context.socket(zmq.PAIR)
 
         return SocketFactory._make_stream(socket, chan_name, on_recv, on_send, host, transport, port, bind, loop)

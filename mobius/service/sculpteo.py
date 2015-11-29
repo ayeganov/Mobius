@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
 
-from concurrent.futures import ProcessPoolExecutor
 import io
 import json
 import logging
+import multiprocessing as mp
 import requests
+from requests_toolbelt.multipart.encoder import MultipartEncoder, MultipartEncoderMonitor
 
 from sqlalchemy.orm.exc import MultipleResultsFound
 from zmq.eventloop import IOLoop
 
+from mobius.comm import msg_pb2
+from mobius.comm.stream import SocketFactory
 from mobius.db import db
 from mobius.db import ProviderID
 from mobius.service import (
-                            AbstractCommand,
-                            BaseService,
-                            Parameter,
-                            ProviderFactory,
-                            ServiceError,
-                            UploadResponse,
-                            make_param_string)
+    BaseService,
+    MobiusCommand,
+    Parameter,
+    ProviderFactory,
+    ServiceError,
+    UploadResponse,
+    make_param_string)
 from mobius.utils import set_up_logging
 
 
@@ -36,19 +39,19 @@ host = "localhost"
 
 
 SCULPTEO_PARAM_MAP = {
-                    Parameter.ID.name: "uuid",
-                    Parameter.QUANTITY.name: "quantity",
-                    Parameter.SCALE.name: "scale",
-                    Parameter.UNIT.name: "unit",
-                    Parameter.CURRENCY.name: "currency",
-                    Parameter.MATERIAL.name: "productname"}
+    Parameter.ID.name: "uuid",
+    Parameter.QUANTITY.name: "quantity",
+    Parameter.SCALE.name: "scale",
+    Parameter.UNIT.name: "unit",
+    Parameter.CURRENCY.name: "currency",
+    Parameter.MATERIAL.name: "productname"}
 
 
-class QuoteCommand(AbstractCommand):
+class QuoteCommand(MobiusCommand):
     '''
     Issue a request to sculpteo service to get the price of the provided model.
     '''
-    def __init__(self, mobius_id, params):
+    def __init__(self, envelope, mobius_id, params):
         '''
         Initialize QuoteService instance.
 
@@ -56,6 +59,7 @@ class QuoteCommand(AbstractCommand):
         @param params - json encoded string containing the parameters for this
                         command
         '''
+        self._envelope = envelope
         self._mobius_id = mobius_id
         log.debug("params {0}".format(params))
         self._params = json.loads(params)
@@ -64,6 +68,10 @@ class QuoteCommand(AbstractCommand):
                                                                       host=host,
                                                                       db=dbname)
         self._db = None
+
+    @property
+    def envelope(self):
+        return self._envelope
 
     def initialize(self):
         '''
@@ -163,15 +171,18 @@ class QuoteCommand(AbstractCommand):
                                    .format(self._mobius_id))
 
 
-class UploadCommand(AbstractCommand):
+class UploadCommand(MobiusCommand):
     '''
     Retrieves the file data from the database associated with the provided
     mobius file id then uploads this file to Sculpteo.
     '''
-    def __init__(self, mobius_id, user_id):
+    def __init__(self, envelope, mobius_id, user_id):
         '''
+        @param envelope - address of the command initiator
         @param mobius_id - database id of the file to be uploaded to Sculpteo
+        @param user_id - id of the user owning the file
         '''
+        self._envelope = envelope
         self._mobius_id = mobius_id
         self._user_id = user_id
         self._db = None
@@ -180,10 +191,15 @@ class UploadCommand(AbstractCommand):
                                                                       host=host,
                                                                       db=dbname)
 
+    @property
+    def envelope(self):
+        return self._envelope
+
     def initialize(self):
         '''
         Create a connection to the database within the new process space.
         '''
+        super().initialize("Sculpteo")
         self._db = db.DBHandle(self._db_url)
 
     def _get_provider_info(self, mob_file):
@@ -197,6 +213,17 @@ class UploadCommand(AbstractCommand):
             if pi.mobius_id == self._mobius_id:
                 return pi
         return None
+
+    def _report_progress(self, monitor):
+        '''
+        This is a callback to MultipartEncoderMonitor to monitor the progress of a file upload.
+
+        @param monitor - MultipartEncoderMonitor observing the file upload process
+        '''
+        progress = int(100 * monitor.bytes_read / monitor.encoder.len)
+        progress_msg = msg_pb2.WorkerState(state_id=msg_pb2.UPLOADING, progress=progress)
+#        log.info("Uploading: {}".format(str(progress_msg)))
+        self.send_async_data(progress_msg)
 
     def _upload_file(self, mob_file):
         '''
@@ -216,13 +243,17 @@ class UploadCommand(AbstractCommand):
         file_handle = io.BytesIO(mob_file.data)
 
         headers = {"X-Requested-With": "XMLHttpRequest"}
-        files = {"file": ("mobius_file.stl", file_handle)}
         params = {"name": mob_file.name,
                   "designer": "bobik",
                   "password": "password",
-                  "share": 0,
-                  "print_authorization": 0}
-        response = requests.post(url=UPLOAD_URL, files=files, data=params, headers=headers)
+                  "share": "0",
+                  "print_authorization": "0",
+                  "file": ("mobius_file.stl", file_handle)}
+        me = MultipartEncoder(fields=params)
+        mem = MultipartEncoderMonitor(me, callback=self._report_progress)
+        headers['Content-Type'] = mem.content_type
+        response = requests.post(url=UPLOAD_URL, data=mem, headers=headers)
+
         return response.json()
 
     def _save_provider_info(self, provider_json):
@@ -284,12 +315,12 @@ class SculpteoFactory(ProviderFactory):
     '''
     Sculpteo command factory that creates Sculpteo specific commands.
     '''
-    def make_upload_command(self, request, context=None):
-        return UploadCommand(request.model.id, request.model.user_id)
+    def make_upload_command(self, envelope, request, context=None):
+        return UploadCommand(envelope, request.model.id, request.model.user_id)
     make_upload_command.__doc__ = ProviderFactory.make_upload_command.__doc__
 
-    def make_quote_command(self, request, context=None):
-        return QuoteCommand(request.model.id, request.params)
+    def make_quote_command(self, envelope, request, context=None):
+        return QuoteCommand(envelope, request.model.id, request.params)
     make_quote_command.__doc__ = ProviderFactory.make_quote_command.__doc__
 
 
@@ -301,16 +332,37 @@ class Sculpteo(BaseService):
         '''
         Initialize instance of Sculpteo service
         '''
-        super(Sculpteo, self).__init__(executor, loop)
-        self._name = "Sculpteo"
+        self._work_sub = SocketFactory.sub_socket("/request/do_work",
+                                                  on_recv=self.process_request,
+                                                  loop=loop)
+        self._work_result = SocketFactory.pub_socket("/request/result",
+                                                     bind=False,
+                                                     loop=loop)
         self._factory = SculpteoFactory()
+        super(Sculpteo, self).__init__(executor, loop)
+        log.info("Sculpteo service work state: {}".format(self._worker_state._path))
+
+    @property
+    def receive_stream(self):
+        return self._work_sub
+
+    @property
+    def response_stream(self):
+        return self._work_result
+
+    def handle_worker_state(self, envelope, msgs):
+        msg = msgs[-1]
+        response = msg_pb2.ProviderResponse(service_name=self.name,
+                                            state=msg)
+        self.response_stream.reply(envelope, response)
+    handle_worker_state.__doc__ = BaseService.handle_worker_state.__doc__
 
     def get_service_context(self):
         return None
 
     @property
     def name(self):
-        return self._name
+        return "Sculpteo"
 
     @property
     def cmd_factory(self):
@@ -321,7 +373,7 @@ def main():
     try:
         set_up_logging()
         loop = IOLoop.instance()
-        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        with mp.Pool(NUM_WORKERS) as executor:
             service = Sculpteo(executor, loop)
             log.info("Sculpteo service started.")
             service.start()
