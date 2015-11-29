@@ -42,9 +42,10 @@ class StreamHandler(PostContentHandler):
         self._cur_headers = None
         self._file_started = False
         self._user_file_name = None
-        self._user_id = int(self.get_secure_cookie("user_id"))
         self._upload_future = None
         self._uploaded_model_id = None
+        self._user_id = self.get_secure_cookie("user_id")
+        self._web_sock = self.application.web_socks.get(self._user_id, None)
 
     def _handle_response(self, envelope, msgs):
         '''
@@ -110,6 +111,11 @@ class StreamHandler(PostContentHandler):
         if self._cur_headers != headers:
             self._cur_headers = headers
 
+        if self._web_sock is not None:
+            self._web_sock.send_progress(self.progress)
+        else:
+            log.error("Erroneous state: Unable to retrieve upload progress WS")
+
         # Process different content types differently
         if self._get_field_name(self._cur_headers) == self.FILE_FIELD:
             self._write_file_data(self._cur_headers, chunk)
@@ -123,7 +129,7 @@ class StreamHandler(PostContentHandler):
         upload_file = DBRequest(command=Command.SAVE_FILE,
                                 path=self._tmp_file.name,
                                 filename=self._user_file_name,
-                                user_id=self._user_id)
+                                user_id=int(self._user_id))
         log.info("Sending upload file: {0}".format(str(upload_file)))
         self._upload_pub.send(upload_file)
         yield self._upload_future
@@ -131,11 +137,11 @@ class StreamHandler(PostContentHandler):
         try:
             result = self._upload_future.result()
             if result.success:
-                log.debug("Successfully uploaded file {0}".format(self._user_file_name))
+                log.debug("Successfully uploaded file {}".format(self._user_file_name))
                 self._uploaded_model_id = result.model.id
             else:
-                log.debug("Failed to upload file {0}".format(self._user_file_name))
+                log.debug("Failed to upload file {}".format(self._user_file_name))
         except:
-            log.error("Error while uploading file: {0}".format(self._user_file_name))
+            log.error("Error while uploading file: {}".format(self._user_file_name))
 
     request_done.__doc__ = PostContentHandler.request_done.__doc__
