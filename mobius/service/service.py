@@ -1,11 +1,14 @@
 import abc
 import collections
 import enum
+import itertools
 import json
 import logging
 
-from mobius.comm.stream import SocketFactory
-from mobius.comm.msg_pb2 import ProviderResponse
+import zmq
+
+from mobius.comm.stream import SocketFactory, Socket
+from mobius.comm.msg_pb2 import ProviderResponse, RESULT, ERROR, WorkerState
 
 log = logging.getLogger(__name__)
 
@@ -82,7 +85,7 @@ class AbstractCommand(metaclass=abc.ABCMeta):
     def initialize(self):
         '''
         This method will be called within the new process/thread, so all
-        resources must acquired here, especially if the command runs in a new
+        resources must be acquired here, especially if the command runs in a new
         process.
         '''
 
@@ -91,6 +94,37 @@ class AbstractCommand(metaclass=abc.ABCMeta):
         '''
         Execute the command.
         '''
+
+
+class MobiusCommand(AbstractCommand):
+    '''
+    Mobius command can communicate back to the service that spawned it.
+    '''
+    def initialize(self, parent):
+        '''
+        Initialize MobiusCommand - this method creates a zmq socket to talk
+        back to the parent process.
+
+        @param parent - parent service of this command that spawned it.
+        '''
+        self._work_state = Socket("/worker/state/{}".format(parent),
+                                  sock_type=zmq.DEALER,
+                                  bind=False)
+
+    @abc.abstractproperty
+    def envelope(self):
+        '''
+        Address of the command requestor.
+        '''
+
+    def send_async_data(self, gpb_msg):
+        '''
+        Send data back to the parent process.
+
+        @param gpb_msg - google protocol buffer message to be sent to the
+                         parent process.
+        '''
+        self._work_state.reply(self.envelope, gpb_msg)
 
 
 class AbstractFactory(metaclass=abc.ABCMeta):
@@ -108,16 +142,17 @@ class AbstractFactory(metaclass=abc.ABCMeta):
         must match the Command enum entries.
         '''
 
-    def create_command(self, request, context=None):
+    def create_command(self, envelope, request, context=None):
         '''
         Create a command object based on the provided request message.
 
+        @param envelope - address of the requestor
         @param request - an instance of Request message defined in msg.proto
         @param context - context containing extra data to be passed to commands
         @returns a concrete instance of AbstractCommand interface
         '''
         try:
-            return self.commands[request.command](request, context=context)
+            return self.commands[request.command](envelope, request, context=context)
         except KeyError:
             raise ServiceError("{0} does not support command {1}"
                                .format(self.__class__.__name__, Command(request.command)))
@@ -125,7 +160,11 @@ class AbstractFactory(metaclass=abc.ABCMeta):
 
 class ProviderFactory(AbstractFactory):
     '''
-    This factory knows how to make commands for 3D providers.
+    This factory knows how to make commands for 3D providers. Look at Command
+    for a list of commands. Currently supported commands:
+
+        make_upload_command
+        make_quote_command
     '''
     def __init__(self):
         '''
@@ -179,6 +218,18 @@ class IService(metaclass=abc.ABCMeta):
         Return the factory which knows how to create commands for this service.
         '''
 
+    @abc.abstractproperty
+    def receive_stream(self):
+        '''
+        ZMQ stream which is responsible for receiving service requests.
+        '''
+
+    @abc.abstractproperty
+    def response_stream(self):
+        '''
+        ZMQ stream which is responsible for transmitting request responses.
+        '''
+
     @abc.abstractmethod
     def get_service_context(self):
         '''
@@ -218,6 +269,21 @@ class IService(metaclass=abc.ABCMeta):
         @param error - error encountered during computation
         '''
 
+    @abc.abstractmethod
+    def handle_worker_state(self, _, msgs):
+        '''
+        When workers report their state of execution this method will receive
+        WorkerState.
+
+        @param msgs - a list of worker states messages
+        '''
+
+    @abc.abstractmethod
+    def worker_id(self):
+        '''
+        A unique worker id to be given to a newly spawned command process.
+        '''
+
 
 class BaseService(IService):
     '''
@@ -234,14 +300,14 @@ class BaseService(IService):
         @param loop - zmq eventloop
         '''
         self._loop = loop
-        self._work_sub = SocketFactory.sub_socket("/request/do_work",
-                                                  on_recv=self.process_request,
-                                                  loop=loop)
-        self._work_result = SocketFactory.pub_socket("/request/result",
-                                                     bind=False,
-                                                     loop=loop)
+        self.receive_stream.on_recv(self.process_request)
+        self._worker_state = SocketFactory.router_socket("/worker/state/%s" % self.name,
+                                                         on_recv=self.handle_worker_state,
+                                                         bind=True,
+                                                         loop=loop)
         self._executor = executor
         self._futures = {}
+        self._worker_id = itertools.count(start=1)
 
     @abc.abstractproperty
     def name(self):
@@ -249,20 +315,26 @@ class BaseService(IService):
         Return the name of this service.
         '''
 
+    def worker_id(self):
+        return next(self._worker_id)
+    worker_id.__doc__ = IService.worker_id.__doc__
+
     def respond_error(self, envelope, request, error):
         log.debug("Responding with error to {0} with {1}".format(request, error))
         json_error = json.dumps({"error": str(error)})
 
+        work_state = WorkerState(state_id=ERROR, error=json_error)
         response = ProviderResponse(service_name=self.name,
-                                    error=json_error)
-        self._work_result.reply(envelope, response)
+                                    state=work_state)
+        self.response_stream.reply(envelope, response)
     respond_error.__doc__ = IService.respond_error.__doc__
 
     def respond_success(self, envelope, request, result):
         log.debug("Responding successfully to {0} with {1}".format(request, result))
+        work_state = WorkerState(state_id=RESULT, response=result)
         response = ProviderResponse(service_name=self.name,
-                                    response=result)
-        self._work_result.reply(envelope, response)
+                                    state=work_state)
+        self.response_stream.reply(envelope, response)
     respond_success.__doc__ = IService.respond_success.__doc__
 
     def process_request(self, envelope, msgs):
@@ -271,33 +343,39 @@ class BaseService(IService):
             log.debug("Got work request: {0} from {1})"
                       .format(request, envelope))
             context = self.get_service_context()
-            worker = self.cmd_factory.create_command(request, context)
-            future = self._executor.submit(worker)
-            self._futures[future] = (envelope, request)
-            future.add_done_callback(self._finish_request)
+            worker = self.cmd_factory.create_command(envelope, request, context)
+
+            work_id = self.worker_id()
+
+            done_callback = lambda _: self._finish_request(work_id)
+            future = self._executor.apply_async(worker,
+                                                callback=done_callback,
+                                                error_callback=done_callback)
+
+            self._futures[work_id] = (envelope, request, future)
         except Exception as e:
             log.exception(e)
             self.respond_error(envelope, request, e)
     process_request.__doc__ = IService.process_request.__doc__
 
-    def _finish_request(self, future):
+    def _finish_request(self, work_id):
         '''
         After request is processed return the result to the requestor
 
         @param future - result of work
         '''
-        envelope, request = self._futures[future]
+        envelope, request, future = self._futures[work_id]
 
         def finish_up():
             try:
                 log.debug("Finished work for {0}".format(str(request)))
-                result = future.result(timeout=0)
+                result = future.get(timeout=0)
                 self.respond_success(envelope, request, result)
             except Exception as e:
                 log.exception(e)
                 self.respond_error(envelope, request, e)
             finally:
-                self._futures.pop(future)
+                self._futures.pop(work_id)
 
         self._loop.add_callback(finish_up)
 

@@ -3,6 +3,7 @@ from .service import (
                       AbstractFactory,
                       BaseService,
                       Command,
+                      MobiusCommand,
                       Parameter,
                       ProviderFactory,
                       ServiceError,

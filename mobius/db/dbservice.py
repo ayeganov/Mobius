@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing.pool
 import logging
 import os
 
@@ -87,7 +87,7 @@ class DBCommandFactory(AbstractFactory):
     def commands(self):
         return self._commands
 
-    def make_save_command(self, request, context):
+    def make_save_command(self, envelope, request, context):
         '''
         Lets save provided file to the database.
         '''
@@ -113,13 +113,19 @@ class DBService(BaseService):
         @param loop - zmq event loop
         '''
         self._db_handle = db.DBHandle(url)
-        self._executor = executor
-        self._loop = loop
         self._new_file_rep = SocketFactory.router_socket("/db/new_file",
                                                          on_recv=self.process_request,
                                                          loop=loop)
         self._db_factory = DBCommandFactory()
-        self._futures = {}
+        super().__init__(executor, loop)
+
+    @property
+    def response_stream(self):
+        return self._new_file_rep
+
+    @property
+    def receive_stream(self):
+        return self._new_file_rep
 
     @property
     def name(self):
@@ -128,6 +134,9 @@ class DBService(BaseService):
     @property
     def cmd_factory(self):
         return self._db_factory
+
+    def handle_worker_state(self, msgs):
+        pass
 
     def respond_success(self, envelope, request, result):
         log.debug("Responding successfully to {0} with {1}".format(request, result))
@@ -162,7 +171,7 @@ def main():
                                                             pswd=authentication,
                                                             host=host,
                                                             db=dbname)
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+    with multiprocessing.pool.ThreadPool(NUM_WORKERS) as executor:
         dbserve = DBService(db_url, executor, loop)
         start_loop(loop)
 

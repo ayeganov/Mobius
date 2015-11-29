@@ -1,4 +1,6 @@
-psycopg2
 SQLAlchemy
+mock
+nose
+psycopg2
+pyzmq
 tornado >= 4.2.0
-zmq

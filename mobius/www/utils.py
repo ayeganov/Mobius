@@ -52,7 +52,7 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
         '''
         self._boundary = None
         self._receiving_data = False
-        self.header_list = []
+        self._header_list = []
         self._buffer = b""
         self._count = 0
         self._total = 1
@@ -86,11 +86,11 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
 
         if end_of_data_idx >= 0:
             data = cont_buf[:(end_of_data_idx - self.LSEP)]
-            self.receive_data(self.header_list[-1], data)
+            self.receive_data(self._header_list[-1], data)
             new_buffer = cont_buf[(end_of_data_idx + len(self._boundary)):]
             return False, new_buffer
         else:
-            self.receive_data(self.header_list[-1], cont_buf)
+            self.receive_data(self._header_list[-1], cont_buf)
             return True, b""
 
     @tornado.gen.coroutine
@@ -137,7 +137,7 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
         '''
         res_headers = dict()
         try:
-            headers, new_buffer = cont_buf.split(self.EOH_SEP, 1)
+            headers, new_buffer = cont_buf.split(self.EOH_SEP, maxsplit=1)
 
             header_list = headers.split(self.SEP)
             for header in header_list:
@@ -164,8 +164,8 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
 
     def _is_end_of_data(self, cont_buf):
         '''
-        Is this the end of the end of this chunk data? There is likely more to
-        come, but this chunk has been exhausted.
+        Is this the end of this chunk of data? There is likely more to come,
+        but has this chunk has been exhausted.
 
         @param cont_buf - buffered HTTP request.
         @returns True if end of data, False otherwise
@@ -201,7 +201,7 @@ class PostContentHandler(RequestHandler, metaclass=abc.ABCMeta):
             else:
                 headers, self._buffer = yield self._read_headers(self._buffer)
                 if headers:
-                    self.header_list.append(headers)
+                    self._header_list.append(headers)
                     self._receiving_data = True
                 else:
                     break
