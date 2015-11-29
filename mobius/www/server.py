@@ -1,9 +1,11 @@
 # Standard lib
 import argparse
+import base64
 import json
 import logging
 import os
 import traceback
+import uuid
 
 
 # 3rd party
@@ -14,15 +16,17 @@ from tornado.httpserver import HTTPServer
 from tornado.web import (RequestHandler,
                          Application,
                          StaticFileHandler)
+import tornado.websocket
 
 from mobius.db import db
 from mobius.comm import stream
-from mobius.comm.msg_pb2 import ProviderRequest, MobiusModel
+from mobius.comm.msg_pb2 import ProviderRequest, MobiusModel, RESULT, ERROR, UPLOADING
 from mobius.comm.stream import SocketFactory
 from mobius.service import Command, Parameter
 from mobius.utils import set_up_logging
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
+from mobius.www.websocks import UploadProgressWS, ProviderUploadProgressWS
 
 
 log = logging.getLogger(__name__)
@@ -78,7 +82,6 @@ class QuoteHandler(RequestHandler):
 
     def _process_result(self, envelope, msgs):
         response = msgs[-1]
-        log.info("Response: {0}".format(msgs))
         self._request_future.set_result(response)
 
     @gen.coroutine
@@ -104,13 +107,16 @@ class QuoteHandler(RequestHandler):
         log.info("One second should have passed.")
 
         response = self._request_future.result()
-        print("Type of response: {0}".format(type(response)))
-        if response.HasField("error"):
+        state = response.state
+        if state.state_id == ERROR:
             self.set_status(500)
-            self.write(response.error)
-        elif response.HasField("response"):
+            self.write(state.error)
+        elif state.state_id == RESULT:
             self.set_status(200)
-            self.write(response.response)
+            self.write(state.response)
+        else:
+            self.set_status(500)
+            self.write("Unexpected error occurred.")
         self._request_future = None
 
 
@@ -129,7 +135,6 @@ class UploadToProvider(RequestHandler):
 
     def _process_result(self, envelope, msgs):
         response = msgs[-1]
-        log.info("Response: {0}".format(msgs))
         self._request_future.set_result(response)
 
     @gen.coroutine
@@ -149,14 +154,49 @@ class UploadToProvider(RequestHandler):
         log.info("One second should have passed.")
 
         response = self._request_future.result()
-        print("Type of response: {0}".format(type(response)))
-        if response.HasField("error"):
+        state = response.state
+        while state.state_id == UPLOADING:
+            log.info("Progress: {}".format(state.progress))
+            self._request_future = Future()
+            yield self._request_future
+            response = self._request_future.result()
+            state = response.state
+
+        if state.state_id == ERROR:
             self.set_status(500)
-            self.write(response.error)
-        elif response.HasField("response"):
+            self.write(state.error)
+        elif state.state_id == RESULT:
             self.set_status(200)
-            self.write(response.response)
+            self.write(state.response)
+        else:
+            self.set_status(500)
+            self.write("Unexpected error occurred.")
         self._request_future = None
+
+
+class TestWebSocket(tornado.websocket.WebSocketHandler):
+    '''
+    First web socket to flesh out the initial design thoughts.
+    '''
+    def on_open(self):
+        '''
+        New web socket opened - self will be a new instance of TestWebSocket
+        connected to its own client.
+        '''
+        log.info("New websocket connected: {0}".format(self))
+
+        self.write_message("You are connected.")
+
+    def on_message(self, message):
+        '''
+        This socket received a message.
+        '''
+        log.info("Got a message: {0}".format(message))
+        loop = eventloop.IOLoop.instance()
+        loop.call_later(1, lambda: self.write_message("hello"))
+
+    def on_close(self):
+        log.info("Web socket closing...")
 
 
 def main():
@@ -200,14 +240,14 @@ def main():
                                                loop=loop)
 
         settings = {
-            "cookie_secret": "lkjasdflkjblkjq/DKkjfk394823kfjdf/aklsdjf="
+            "cookie_secret": base64.encodebytes(uuid.uuid4().bytes + uuid.uuid4().bytes)
         }
 
         db_url = "postgresql://{usr}:{pswd}@{host}/{db}".format(usr=username,
                                                                 pswd=authentication,
                                                                 host=host,
                                                                 db=dbname)
-        db_handle = db.DBHandle(db_url, True)
+        db_handle = db.DBHandle(db_url, verbose=True)
         app = Application(
             [
                 # Static file handlers
@@ -219,6 +259,9 @@ def main():
                 (r'/quote', QuoteHandler, {"loop": loop}),
                 (r'/provider_upload', UploadToProvider, {"loop": loop}),
 
+                (r'/ws/upload_progress', UploadProgressWS),
+                (r'/ws/provider_upload_progress', ProviderUploadProgressWS),
+
                 # Page handlers
                 (r"/", MainHandler, {"db_handle": db_handle}),
             ],
@@ -227,6 +270,8 @@ def main():
             debug=True,
             **settings
         )
+        app.loop = loop
+        app.web_socks = {}
 
         server = HTTPServer(app, max_body_size=get_max_request_buffer())
 
