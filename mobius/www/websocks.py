@@ -17,7 +17,7 @@ class UploadProgressWS(tornado.websocket.WebSocketHandler):
         connected to its own client.
         '''
         user_id = self.get_secure_cookie("user_id")
-        self.application.web_socks[user_id] = self
+        self.application._web_socks[user_id] = self
 
     def on_message(self, message):
         '''

@@ -37,7 +37,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='msg.proto',
   package='base',
-  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0f\n\x07user_id\x18\x02 \x01(\x05\"\"\n\x0eUploadProgress\x12\x10\n\x08progress\x18\x01 \x01(\x05\"9\n\x10ProviderProgress\x12\x13\n\x0bprovider_id\x18\x01 \x01(\x05\x12\x10\n\x08progress\x18\x02 \x01(\x05\"M\n\tDBRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x10\n\x08\x66ilename\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\x05\"N\n\nDBResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12 \n\x05model\x18\x02 \x01(\x0b\x32\x11.base.MobiusModel\x12\r\n\x05\x65rror\x18\x03 \x01(\t\"T\n\x0fProviderRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0e\n\x06params\x18\x02 \x01(\t\x12 \n\x05model\x18\x03 \x01(\x0b\x32\x11.base.MobiusModel\"a\n\x0bWorkerState\x12\x1f\n\x08state_id\x18\x01 \x01(\x0e\x32\r.base.StateId\x12\x10\n\x08response\x18\x02 \x01(\t\x12\r\n\x05\x65rror\x18\x03 \x01(\t\x12\x10\n\x08progress\x18\x04 \x01(\x05\"J\n\x10ProviderResponse\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\x12 \n\x05state\x18\x02 \x01(\x0b\x32\x11.base.WorkerState*/\n\x07StateId\x12\n\n\x06RESULT\x10\x01\x12\t\n\x05\x45RROR\x10\x02\x12\r\n\tUPLOADING\x10\x03'))
+  serialized_pb=b('\n\tmsg.proto\x12\x04\x62\x61se\"\x15\n\x06String\x12\x0b\n\x03val\x18\x01 \x02(\t\"\x15\n\x06UInt32\x12\x0b\n\x03val\x18\x01 \x02(\r\"\x13\n\x04\x42ool\x12\x0b\n\x03val\x18\x01 \x02(\x08\"\x14\n\x05\x46loat\x12\x0b\n\x03val\x18\x01 \x02(\x02\"\x15\n\x06\x44ouble\x12\x0b\n\x03val\x18\x01 \x02(\x01\"*\n\x0bMobiusModel\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0f\n\x07user_id\x18\x02 \x01(\x05\"\"\n\x0eUploadProgress\x12\x10\n\x08progress\x18\x01 \x01(\x05\"1\n\x08Progress\x12\x13\n\x0bprovider_id\x18\x01 \x01(\x05\x12\x10\n\x08progress\x18\x02 \x01(\x05\"\\\n\tDBRequest\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x10\n\x08\x66ilename\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\x05\x12\r\n\x05\x65mail\x18\x05 \x01(\t\"^\n\nDBResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12 \n\x05model\x18\x02 \x01(\x0b\x32\x11.base.MobiusModel\x12\x0e\n\x06result\x18\x03 \x01(\t\x12\r\n\x05\x65rror\x18\x04 \x01(\t\"*\n\x07Request\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\x05\x12\x0e\n\x06params\x18\x02 \x01(\t\"O\n\x0bWorkerState\x12\x1f\n\x08state_id\x18\x01 \x01(\x0e\x32\r.base.StateId\x12\x10\n\x08response\x18\x02 \x01(\t\x12\r\n\x05\x65rror\x18\x03 \x01(\t\"B\n\x08Response\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\x12 \n\x05state\x18\x02 \x01(\x0b\x32\x11.base.WorkerState*/\n\x07StateId\x12\n\n\x06RESULT\x10\x01\x12\t\n\x05\x45RROR\x10\x02\x12\r\n\tUPLOADING\x10\x03'))
 
 _STATEID = _descriptor.EnumDescriptor(
   name='StateId',
@@ -60,8 +60,8 @@ _STATEID = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=690,
-  serialized_end=737,
+  serialized_start=645,
+  serialized_end=692,
 )
 
 StateId = enum_type_wrapper.EnumTypeWrapper(_STATEID)
@@ -274,22 +274,22 @@ _UPLOADPROGRESS = _descriptor.Descriptor(
 )
 
 
-_PROVIDERPROGRESS = _descriptor.Descriptor(
-  name='ProviderProgress',
-  full_name='base.ProviderProgress',
+_PROGRESS = _descriptor.Descriptor(
+  name='Progress',
+  full_name='base.Progress',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='provider_id', full_name='base.ProviderProgress.provider_id', index=0,
+      name='provider_id', full_name='base.Progress.provider_id', index=0,
       number=1, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='progress', full_name='base.ProviderProgress.progress', index=1,
+      name='progress', full_name='base.Progress.progress', index=1,
       number=2, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -305,7 +305,7 @@ _PROVIDERPROGRESS = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=211,
-  serialized_end=268,
+  serialized_end=260,
 )
 
 
@@ -344,6 +344,13 @@ _DBREQUEST = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='email', full_name='base.DBRequest.email', index=4,
+      number=5, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -353,8 +360,8 @@ _DBREQUEST = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=270,
-  serialized_end=347,
+  serialized_start=262,
+  serialized_end=354,
 )
 
 
@@ -380,8 +387,15 @@ _DBRESPONSE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='error', full_name='base.DBResponse.error', index=2,
+      name='result', full_name='base.DBResponse.result', index=2,
       number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode(b(""), "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='error', full_name='base.DBResponse.error', index=3,
+      number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode(b(""), "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -395,36 +409,29 @@ _DBRESPONSE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=349,
-  serialized_end=427,
+  serialized_start=356,
+  serialized_end=450,
 )
 
 
-_PROVIDERREQUEST = _descriptor.Descriptor(
-  name='ProviderRequest',
-  full_name='base.ProviderRequest',
+_REQUEST = _descriptor.Descriptor(
+  name='Request',
+  full_name='base.Request',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='command', full_name='base.ProviderRequest.command', index=0,
+      name='command', full_name='base.Request.command', index=0,
       number=1, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='params', full_name='base.ProviderRequest.params', index=1,
+      name='params', full_name='base.Request.params', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode(b(""), "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='model', full_name='base.ProviderRequest.model', index=2,
-      number=3, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -437,8 +444,8 @@ _PROVIDERREQUEST = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=429,
-  serialized_end=513,
+  serialized_start=452,
+  serialized_end=494,
 )
 
 
@@ -470,13 +477,6 @@ _WORKERSTATE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
-    _descriptor.FieldDescriptor(
-      name='progress', full_name='base.WorkerState.progress', index=3,
-      number=4, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
   ],
   extensions=[
   ],
@@ -486,27 +486,27 @@ _WORKERSTATE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=515,
-  serialized_end=612,
+  serialized_start=496,
+  serialized_end=575,
 )
 
 
-_PROVIDERRESPONSE = _descriptor.Descriptor(
-  name='ProviderResponse',
-  full_name='base.ProviderResponse',
+_RESPONSE = _descriptor.Descriptor(
+  name='Response',
+  full_name='base.Response',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='service_name', full_name='base.ProviderResponse.service_name', index=0,
+      name='service_name', full_name='base.Response.service_name', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode(b(""), "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='state', full_name='base.ProviderResponse.state', index=1,
+      name='state', full_name='base.Response.state', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -521,14 +521,13 @@ _PROVIDERRESPONSE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=614,
-  serialized_end=688,
+  serialized_start=577,
+  serialized_end=643,
 )
 
 _DBRESPONSE.fields_by_name['model'].message_type = _MOBIUSMODEL
-_PROVIDERREQUEST.fields_by_name['model'].message_type = _MOBIUSMODEL
 _WORKERSTATE.fields_by_name['state_id'].enum_type = _STATEID
-_PROVIDERRESPONSE.fields_by_name['state'].message_type = _WORKERSTATE
+_RESPONSE.fields_by_name['state'].message_type = _WORKERSTATE
 DESCRIPTOR.message_types_by_name['String'] = _STRING
 DESCRIPTOR.message_types_by_name['UInt32'] = _UINT32
 DESCRIPTOR.message_types_by_name['Bool'] = _BOOL
@@ -536,12 +535,12 @@ DESCRIPTOR.message_types_by_name['Float'] = _FLOAT
 DESCRIPTOR.message_types_by_name['Double'] = _DOUBLE
 DESCRIPTOR.message_types_by_name['MobiusModel'] = _MOBIUSMODEL
 DESCRIPTOR.message_types_by_name['UploadProgress'] = _UPLOADPROGRESS
-DESCRIPTOR.message_types_by_name['ProviderProgress'] = _PROVIDERPROGRESS
+DESCRIPTOR.message_types_by_name['Progress'] = _PROGRESS
 DESCRIPTOR.message_types_by_name['DBRequest'] = _DBREQUEST
 DESCRIPTOR.message_types_by_name['DBResponse'] = _DBRESPONSE
-DESCRIPTOR.message_types_by_name['ProviderRequest'] = _PROVIDERREQUEST
+DESCRIPTOR.message_types_by_name['Request'] = _REQUEST
 DESCRIPTOR.message_types_by_name['WorkerState'] = _WORKERSTATE
-DESCRIPTOR.message_types_by_name['ProviderResponse'] = _PROVIDERRESPONSE
+DESCRIPTOR.message_types_by_name['Response'] = _RESPONSE
 
 String = _reflection.GeneratedProtocolMessageType('String', (_message.Message,),
     {
@@ -585,10 +584,10 @@ UploadProgress = _reflection.GeneratedProtocolMessageType('UploadProgress', (_me
       # @@protoc_insertion_point(class_scope:base.UploadProgress)
     })
 
-ProviderProgress = _reflection.GeneratedProtocolMessageType('ProviderProgress', (_message.Message,),
+Progress = _reflection.GeneratedProtocolMessageType('Progress', (_message.Message,),
     {
-      'DESCRIPTOR': _PROVIDERPROGRESS,
-      # @@protoc_insertion_point(class_scope:base.ProviderProgress)
+      'DESCRIPTOR': _PROGRESS,
+      # @@protoc_insertion_point(class_scope:base.Progress)
     })
 
 DBRequest = _reflection.GeneratedProtocolMessageType('DBRequest', (_message.Message,),
@@ -603,10 +602,10 @@ DBResponse = _reflection.GeneratedProtocolMessageType('DBResponse', (_message.Me
       # @@protoc_insertion_point(class_scope:base.DBResponse)
     })
 
-ProviderRequest = _reflection.GeneratedProtocolMessageType('ProviderRequest', (_message.Message,),
+Request = _reflection.GeneratedProtocolMessageType('Request', (_message.Message,),
     {
-      'DESCRIPTOR': _PROVIDERREQUEST,
-      # @@protoc_insertion_point(class_scope:base.ProviderRequest)
+      'DESCRIPTOR': _REQUEST,
+      # @@protoc_insertion_point(class_scope:base.Request)
     })
 
 WorkerState = _reflection.GeneratedProtocolMessageType('WorkerState', (_message.Message,),
@@ -615,10 +614,10 @@ WorkerState = _reflection.GeneratedProtocolMessageType('WorkerState', (_message.
       # @@protoc_insertion_point(class_scope:base.WorkerState)
     })
 
-ProviderResponse = _reflection.GeneratedProtocolMessageType('ProviderResponse', (_message.Message,),
+Response = _reflection.GeneratedProtocolMessageType('Response', (_message.Message,),
     {
-      'DESCRIPTOR': _PROVIDERRESPONSE,
-      # @@protoc_insertion_point(class_scope:base.ProviderResponse)
+      'DESCRIPTOR': _RESPONSE,
+      # @@protoc_insertion_point(class_scope:base.Response)
     })
 
 

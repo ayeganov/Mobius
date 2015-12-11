@@ -41,6 +41,7 @@
         <form data-dojo-type="dijit/form/Form" enctype="multipart/form-data" action="/upload" method="post"
               data-dojo-props="region: 'bottom'">
 
+            <p>Hello {{ user.email }}, try uploading some files.</p>
             File: <input type="file" name="fileID" accept="*.stl,*.obj"/>
             Name: <input type="text" name="fileName" />
             <br />

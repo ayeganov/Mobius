@@ -8,7 +8,7 @@ import logging
 import zmq
 
 from mobius.comm.stream import SocketFactory, Socket
-from mobius.comm.msg_pb2 import ProviderResponse, RESULT, ERROR, WorkerState
+from mobius.comm.msg_pb2 import Response, RESULT, ERROR, WorkerState
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ class Command(enum.IntEnum):
     QUOTE = 1
     UPLOAD = 2
     SAVE_FILE = 3
+    FIND_USER = 4
+    CREATE_USER = 5
 
 
 class Parameter(enum.IntEnum):
@@ -156,6 +158,9 @@ class AbstractFactory(metaclass=abc.ABCMeta):
         except KeyError:
             raise ServiceError("{0} does not support command {1}"
                                .format(self.__class__.__name__, Command(request.command)))
+        except Exception as e:
+            log.exception(e)
+            raise e
 
 
 class ProviderFactory(AbstractFactory):
@@ -301,7 +306,7 @@ class BaseService(IService):
         '''
         self._loop = loop
         self.receive_stream.on_recv(self.process_request)
-        self._worker_state = SocketFactory.router_socket("/worker/state/%s" % self.name,
+        self._worker_state = SocketFactory.dealer_socket("/worker/state/%s" % self.name,
                                                          on_recv=self.handle_worker_state,
                                                          bind=True,
                                                          loop=loop)
@@ -324,16 +329,16 @@ class BaseService(IService):
         json_error = json.dumps({"error": str(error)})
 
         work_state = WorkerState(state_id=ERROR, error=json_error)
-        response = ProviderResponse(service_name=self.name,
-                                    state=work_state)
+        response = Response(service_name=self.name,
+                            state=work_state)
         self.response_stream.reply(envelope, response)
     respond_error.__doc__ = IService.respond_error.__doc__
 
     def respond_success(self, envelope, request, result):
         log.debug("Responding successfully to {0} with {1}".format(request, result))
         work_state = WorkerState(state_id=RESULT, response=result)
-        response = ProviderResponse(service_name=self.name,
-                                    state=work_state)
+        response = Response(service_name=self.name,
+                            state=work_state)
         self.response_stream.reply(envelope, response)
     respond_success.__doc__ = IService.respond_success.__doc__
 

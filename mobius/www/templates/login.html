@@ -1,0 +1,17 @@
+<html>
+    <head>
+        <title>Please Log In</title>
+    </head>
+<body>
+    <form action="/auth/login" method="POST">
+        {% if error is not None %}
+            <p> {{ error }} </p>
+        {% end %}
+        Email: <input type="text" name="email" />
+        Password: <input type="password" name="password" />
+        <input type="submit" value="Log In" />
+        <input type="submit" formaction="/auth/create" value="Sign Up"/>
+    </form>
+    <a href="/auth/logout">Logout</a>
+</body>
+</html>
