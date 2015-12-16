@@ -8,7 +8,7 @@ import uuid
 
 
 # 3rd party
-from zmq import eventloop
+import zmq.eventloop
 from tornado import escape
 from tornado import gen
 from tornado.concurrent import Future
@@ -18,14 +18,13 @@ from tornado.web import (
                          authenticated,
                          RequestHandler,
                          StaticFileHandler)
-import tornado.websocket
 
 from mobius.db import db
 from mobius.comm import stream
-from mobius.comm.msg_pb2 import Request, MobiusModel, RESULT, ERROR, UPLOADING
+from mobius.comm.msg_pb2 import Request, RESULT, ERROR, UPLOADING
 from mobius.comm.stream import SocketFactory
 from mobius.service import Command, Parameter
-from mobius.utils import set_up_logging, JSONObject
+from mobius.utils import set_up_logging, JSONObject, eventloop
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
 from mobius.www.websocks import UploadProgressWS, ProviderUploadProgressWS
@@ -163,7 +162,7 @@ class AuthCreateHandler(BaseHandler):
         self._loop = loop
 
     def get(self):
-        self.render("login.html", error=None)
+        self.render("login.html", error=None, next=self.get_argument('next', '/'))
 
     @gen.coroutine
     def post(self):
@@ -197,7 +196,7 @@ class AuthLoginHandler(BaseHandler):
 
     def get(self):
         if self.current_user is None:
-            self.render("login.html", error=None)
+            self.render("login.html", error=None, next=self.get_argument('next', '/'))
         else:
             self.redirect("/")
 
@@ -217,7 +216,7 @@ class AuthLoginHandler(BaseHandler):
             # don't forget to delete the password from the cookie
             del user.password
             self.set_secure_cookie("mobius_user", user.json_string)
-            self.redirect(self.get_argument("next", "/"))
+            self.redirect(self.get_argument('next', '/'))
         else:
             self.render("login.html", error="Incorrect Credentials")
 
@@ -226,13 +225,15 @@ class AuthLogoutHandler(BaseHandler):
     '''
     All logout activity should be done in this handler.
     '''
+    def initialize(self, loop):
+        self._loop = loop
+
     def get(self):
         self.render("logout.html", user=self.current_user)
 
     def post(self):
-        if self.get_argument("logout", None):
-            self.clear_cookie("email")
-            self.redirect("/")
+        self.clear_cookie("mobius_user")
+        self.redirect("/")
 
 
 class MainHandler(BaseHandler):
@@ -280,7 +281,7 @@ class QuoteHandler(BaseHandler):
         params.http_params = {Parameter.QUANTITY.name: 1,
                               Parameter.SCALE.name: 0.1,
                               Parameter.UNIT.name: "cm"}
-#                            Parameter.MATERIAL.name: "metal_cast_silver_sanded"}
+#                              Parameter.MATERIAL.name: "metal_cast_silver_sanded"}
 
         request = Request(command=Command.QUOTE.value,
                           params=params.json_string)
@@ -361,31 +362,6 @@ class UploadToProvider(BaseHandler):
         self._request_future = None
 
 
-class TestWebSocket(tornado.websocket.WebSocketHandler):
-    '''
-    First web socket to flesh out the initial design thoughts.
-    '''
-    def on_open(self):
-        '''
-        New web socket opened - self will be a new instance of TestWebSocket
-        connected to its own client.
-        '''
-        log.info("New websocket connected: {0}".format(self))
-
-        self.write_message("You are connected.")
-
-    def on_message(self, message):
-        '''
-        This socket received a message.
-        '''
-        log.info("Got a message: {0}".format(message))
-        loop = eventloop.IOLoop.instance()
-        loop.call_later(1, lambda: self.write_message("hello"))
-
-    def on_close(self):
-        log.info("Web socket closing...")
-
-
 class Session:
     """
     A user's session with a system.
@@ -404,7 +380,7 @@ class Session:
         """
         Initialize a session with a unique ID for that session.
         """
-        self._loop = eventloop.IOLoop.instance() if loop is None else loop
+        self._loop = zmq.eventloop.IOLoop.instance() if loop is None else loop
 
         self.app = app
         self.uid = uid
@@ -535,19 +511,25 @@ def main():
         args = parser.parse_args()
 
         set_up_logging(logging.DEBUG if args.verbose else logging.INFO)
-        loop = eventloop.IOLoop.instance()
+        loop = zmq.eventloop.IOLoop.instance()
         local_proxy = stream.LocalRequestProxy(front_end_name="/request/local",
                                                back_end_name="/request/request",
                                                loop=loop)
         app = MobiusApplication(loop=loop)
         server = HTTPServer(app, max_body_size=get_max_request_buffer())
 
-        server.listen(args.port)
-        loop.start()
+        @eventloop
+        def start_loop(loop):
+            log.info("Mobius server running on port {} started.".format(args.port))
+            server.listen(args.port)
+            loop.start()
+
+        start_loop(loop)
+
     except (SystemExit, KeyboardInterrupt):
         print("Exiting due to interrupt...")
-    except Exception:
-        traceback.print_exc()
+    except Exception as e:
+        log.exception(e)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html ng-app="mobius_app">
     <head>
         <meta http-equiv="Contenty-Type" content="text/html"; charset=UTF-8"/>
         <title>Upload form</title>
-        <link href="static/js/dijit/themes/claro/claro.css" rel="stylesheet" type="text/css"/>
+        <link rel="stylesheet" href={{ static_url("css/bootstrap.css") }}>
+        <link rel="stylesheet" href={{ static_url("css/app.css") }}>
         <script src="static/js/dojo/dojo.js"; data-dojo-config="async: true"></script>
+
+        <script src={{ static_url("js/angular/angular.js") }}></script>
+        <script src={{ static_url("js/angular/angular-route.js") }}></script>
+        <script src={{ static_url("app/app.js") }}></script>
+        <script src={{ static_url("app/controllers.js") }}></script>
+
         <!--link href="static/js/dijit/themes/dijit.css" rel="stylesheet" type="text/css"/>
         <link
         href="//ajax.googleapis.com/ajax/libs/dojo/1.10.1/dijit/themes/claro/claro.css"
@@ -13,46 +20,19 @@
         <script type="text/javascript" src={{ static_url("underscore/underscore-min.js") }}></script>
         <script type="text/javascript" src={{ static_url("js/main/main.js") }}></script>
     </head>
-    <body class="claro" style="height:500px;widht:100%;">
-      <div data-dojo-type="dijit/layout/BorderContainer"
-           style="height:100%;width:100%;">
-        <div data-dojo-type="dijit/layout/ContentPane"
-             data-dojo-props="region: 'top'">
-          <div data-dojo-type="dijit/MenuBar">
-            <div data-dojo-type="dijit/PopupMenuBarItem">
-              <span>File</span>
-              <div data-dojo-type="dijit/DropDownMenu">
-                <div data-dojo-type="dijit/MenuItem">Open</div>
-                <div data-dojo-type="dijit/MenuItem">Save</div>
-                <div data-dojo-type="dijit/PopupMenuItem">
-                  <span>Recent...</span>
-                  <div data-dojo-type="dijit/DropDownMenu">
-                    <div data-dojo-type="dijit/MenuItem">Recent Item 1</div>
-                    <div data-dojo-type="dijit/MenuItem">Recent Item 2</div>
+  <body>
 
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <span style="color: green">Hello {{ user.email }}, try uploading some files.</span>
+    <form data-dojo-type="dijit/form/Form" enctype="multipart/form-data" action="/upload" method="post"
+          data-dojo-props="region: 'bottom'">
 
-        <!--p><h1>Select & Upload</h1></p-->
-        <form data-dojo-type="dijit/form/Form" enctype="multipart/form-data" action="/upload" method="post"
-              data-dojo-props="region: 'bottom'">
+        File: <input type="file" name="fileID" accept="*.stl,*.obj"/>
+        Name: <input type="text" name="fileName" />
+        <br />
+        <br />
+        <input type="submit" value="upload" />
+    </form>
 
-            <p>Hello {{ user.email }}, try uploading some files.</p>
-            File: <input type="file" name="fileID" accept="*.stl,*.obj"/>
-            Name: <input type="text" name="fileName" />
-            <br />
-            <br />
-            <input type="submit" value="upload" />
-        </form>
-
-        <script>
-            require(["dojo/parser"], function(parser){
-                parser.parse();
-            });
-        </script>
-    </body>
+    <div ng-view></div>
+  </body>
 </html>

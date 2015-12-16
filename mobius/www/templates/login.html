@@ -3,12 +3,17 @@
         <title>Please Log In</title>
     </head>
 <body>
+    {% if error %}
+    <span style="color: red">Error: {{ error }}</span>
+    {% end %}
+    {% if next %}
+    <span style="color: blue">Next: {{ next }} </span>
+    {% end %}
     <form action="/auth/login" method="POST">
-        {% if error is not None %}
-            <p> {{ error }} </p>
-        {% end %}
         Email: <input type="text" name="email" />
         Password: <input type="password" name="password" />
+        <input type="hidden" name="next" value="{{ next }}" />
+
         <input type="submit" value="Log In" />
         <input type="submit" formaction="/auth/create" value="Sign Up"/>
     </form>

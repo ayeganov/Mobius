@@ -4,9 +4,8 @@
     </head>
 <body>
     <form action="/auth/logout" method="POST">
-        <p> Please logout {{ user }} </p>
-        Email: <input type="text" name="email" />
-        <input type="submit" value="Log In" />
+        <p> Please logout {{ user.email }} </p>
+        <input type="submit" value="Log Out" />
     </form>
 </body>
 </html>
