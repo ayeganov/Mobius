@@ -6,13 +6,13 @@
     {% if error %}
     <span style="color: red">Error: {{ error }}</span>
     {% end %}
-    {% if next %}
-    <span style="color: blue">Next: {{ next }} </span>
+    {% if next_page %}
+    <span style="color: blue">Next: {{ next_page }} </span>
     {% end %}
     <form action="/auth/login" method="POST">
         Email: <input type="text" name="email" />
         Password: <input type="password" name="password" />
-        <input type="hidden" name="next" value="{{ next }}" />
+        <input type="hidden" name="next_page" value="{{ next_page }}" />
 
         <input type="submit" value="Log In" />
         <input type="submit" formaction="/auth/create" value="Sign Up"/>

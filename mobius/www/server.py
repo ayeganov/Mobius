@@ -162,7 +162,7 @@ class AuthCreateHandler(BaseHandler):
         self._loop = loop
 
     def get(self):
-        self.render("login.html", error=None, next=self.get_argument('next', '/'))
+        self.render("login.html", error=None, next_page=self.get_argument('next', '/'))
 
     @gen.coroutine
     def post(self):
@@ -182,7 +182,7 @@ class AuthCreateHandler(BaseHandler):
             if "password" in new_user:
                 del new_user.password
             self.set_secure_cookie("mobius_user", new_user.json_string)
-            self.redirect(self.get_argument("next", "/"))
+            self.redirect(self.get_argument("next_page", "/"))
         except RequestError as req_err:
             self.render("login.html", error=str(req_err))
 
@@ -196,7 +196,7 @@ class AuthLoginHandler(BaseHandler):
 
     def get(self):
         if self.current_user is None:
-            self.render("login.html", error=None, next=self.get_argument('next', '/'))
+            self.render("login.html", error=None, next_page=self.get_argument('next', '/'))
         else:
             self.redirect("/")
 
@@ -208,7 +208,9 @@ class AuthLoginHandler(BaseHandler):
         user = yield load_user(email, self._loop)
 
         if user is None:
-            self.render('login.html', error="Incorrect Credentials")
+            self.render('login.html',
+                        error="Incorrect Credentials",
+                        next_page=self.get_argument('next_page', '/'))
             return
 
         hashed_password = yield hash_password(password, salt=user.password, loop=self._loop)
@@ -216,7 +218,7 @@ class AuthLoginHandler(BaseHandler):
             # don't forget to delete the password from the cookie
             del user.password
             self.set_secure_cookie("mobius_user", user.json_string)
-            self.redirect(self.get_argument('next', '/'))
+            self.redirect(self.get_argument('next_page', '/'))
         else:
             self.render("login.html", error="Incorrect Credentials")
 

@@ -1,6 +1,9 @@
 var mobius_app = angular.module("mobius_app", [
     'ngRoute',
-    'mobiusControllers'
+    'mobiusAnimations',
+    'mobiusControllers',
+    'mobiusFilters',
+    'mobiusServices'
 ]);
 
 mobius_app.config(['$routeProvider',
