@@ -5,7 +5,9 @@
         <title>Upload form</title>
         <link rel="stylesheet" href={{ static_url("css/bootstrap.css") }}>
         <link rel="stylesheet" href={{ static_url("css/app.css") }}>
+        <link rel="stylesheet" href={{ static_url("css/mobius.css") }}>
         <link rel="stylesheet" href={{ static_url("css/animations.css") }}>
+        <link rel="stylesheet" href={{ static_url("css/angular-flash.min.css") }}>
         <script src="static/js/dojo/dojo.js"; data-dojo-config="async: true"></script>
 
         <script src={{ static_url("js/jquery/jquery-2.1.4.js") }}></script>
@@ -13,33 +15,22 @@
         <script src={{ static_url("js/angular/angular-animate.js") }}></script>
         <script src={{ static_url("js/angular/angular-route.js") }}></script>
         <script src={{ static_url("js/angular/angular-resource.js") }}></script>
+        <script src={{ static_url("js/angular/ui-bootstrap-tpls-0.14.3.js") }}></script>
+        <script src={{ static_url("js/angular/ng-file-upload-10.1.14/dist/ng-file-upload-shim.js") }}></script>
+        <script src={{ static_url("js/angular/ng-file-upload-10.1.14/dist/ng-file-upload.js") }}></script>
+        <script src={{ static_url("js/angular/angular-flash.min.js") }}></script>
         <script src={{ static_url("app/app.js") }}></script>
         <script src={{ static_url("app/animations.js") }}></script>
         <script src={{ static_url("app/controllers.js") }}></script>
         <script src={{ static_url("app/filters.js") }}></script>
         <script src={{ static_url("app/services.js") }}></script>
 
-        <!--link href="static/js/dijit/themes/dijit.css" rel="stylesheet" type="text/css"/>
-        <link
-        href="//ajax.googleapis.com/ajax/libs/dojo/1.10.1/dijit/themes/claro/claro.css"
-        rel="stylesheet" type="text/css" />
-        <script src="//ajax.googleapis.com/ajax/libs/dojo/1.10.1/dojo/dojo.js"></script-->
         <script type="text/javascript" src={{ static_url("underscore/underscore-min.js") }}></script>
         <script type="text/javascript" src={{ static_url("js/main/main.js") }}></script>
     </head>
   <body>
-
-    <span style="color: green">Hello {{ user.email }}, try uploading some files.</span>
-    <form data-dojo-type="dijit/form/Form" enctype="multipart/form-data" action="/upload" method="post"
-          data-dojo-props="region: 'bottom'">
-
-        File: <input type="file" name="fileID" accept="*.stl,*.obj"/>
-        Name: <input type="text" name="fileName" />
-        <br />
-        <br />
-        <input type="submit" value="upload" />
-    </form>
-
-    <div ng-view></div>
+    <div class="container">
+      <div ng-view></div>
+    </div>
   </body>
 </html>

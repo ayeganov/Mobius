@@ -45,7 +45,6 @@ class StreamHandler(PostContentHandler):
         self._user_file_name = None
         self._upload_future = None
         self._uploaded_model_id = None
-        self._web_sock = None #self.application._web_socks.get(self._user_id, None)
 
     def get_current_user(self):
         '''
@@ -103,6 +102,8 @@ class StreamHandler(PostContentHandler):
         '''
         if self._get_field_name(headers) == self.NAME_FIELD:
             self._user_file_name = data.decode(self.HEADER_ENCODING)
+        else:
+            log.info("Field name: {}".format(self._get_field_name(headers)))
 
     def _get_field_name(self, headers):
         '''
@@ -120,11 +121,7 @@ class StreamHandler(PostContentHandler):
         if self._cur_headers != headers:
             self._cur_headers = headers
 
-        if self._web_sock is not None:
-            self._web_sock.send_progress(self.progress)
-        else:
-            log.error("Erroneous state: Unable to retrieve upload progress WS")
-
+        print("WTF")
         # Process different content types differently
         if self._get_field_name(self._cur_headers) == self.FILE_FIELD:
             self._write_file_data(self._cur_headers, chunk)

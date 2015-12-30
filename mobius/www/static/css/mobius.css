@@ -1,0 +1,197 @@
+@font-face {
+    font-family: gotham_light;
+    src: url("gotham_light.woff");
+}
+
+@font-face {
+    font-family: gotham_book;
+    src: url("gotham_book.woff");
+}
+
+@font-face {
+    font-family: gotham_medium;
+    src: url("gotham_medium.woff");
+}
+
+@font-face {
+    font-family: gotham_bold;
+    src: url("gotham_bold.woff");
+}
+
+
+/**
+ * Mobius font styles.
+ */
+.T1 {
+    font-family: gotham_bold;
+    font-size: 12;
+    line-height: 15px;
+}
+
+.T2 {
+    font-family: gotham_medium;
+    font-size: 17;
+    line-height: 23px;
+}
+
+.T3 {
+    font-family: gotham_medium;
+    font-size: 16;
+    line-height: 24px;
+}
+
+.T4 {
+    font-family: gotham_medium;
+    font-size: 12;
+    line-height: 18px;
+}
+
+.T5 {
+    font-family: gotham_book;
+    font-size: 15;
+    line-height: 17px;
+}
+
+.T6 {
+    font-family: gotham_book;
+    font-size: 17;
+    line-height: 24px;
+}
+
+.T7 {
+    font-family: gotham_book;
+    font-size: 22;
+    line-height: 26px;
+}
+
+.T8 {
+    font-family: gotham_book;
+    font-size: 13;
+    line-height: 16px;
+}
+
+.T9 {
+    font-family: gotham_light;
+    font-size: 33;
+    line-height: 40px;
+}
+
+.T10 {
+    font-family: gotham_light;
+    font-size: 27px;
+    line-height: 33px;
+}
+
+.T11 {
+    font-family: gotham_light;
+    font-size: 27px;
+    line-height: 41px;
+}
+
+.T12 {
+    font-family: gotham_light;
+    font-size: 27px;
+    line-height: 46px;
+}
+
+.T13 {
+    font-family: gotham_light;
+    font-size: 20px;
+    line-height: 26px;
+}
+
+.T14 {
+    font-family: gotham_light;
+    font-size: 18px;
+    line-height: 31px;
+}
+
+.T15 {
+    font-family: gotham_light;
+    font-size: 17px;
+    line-height: 25px;
+}
+
+.T16 {
+    font-family: gotham_light;
+    font-size: 17px;
+    line-height: 23px;
+}
+
+.T17 {
+    font-family: gotham_light;
+    font-size: 16px;
+    line-height: 25px;
+}
+
+.T18 {
+    font-family: gotham_light;
+    font-size: 15px;
+    line-height: 18px;
+}
+
+.T19 {
+    font-family: gotham_light;
+    font-size: 14px;
+    line-height: 16px;
+}
+
+.T20 {
+    font-family: gotham_light;
+    font-size: 13px;
+    line-height: 18px;
+}
+
+.col-offset {
+    margin-left: 3%;
+}
+
+/*****************************
+ *    Upload form classes    *
+ ****************************/
+
+/*
+ * Flex row makes sure the row items are all the same height.
+ */
+.flex-row {
+    display: flex;
+}
+
+/*
+ * Styles the box into which files can be dragged.
+ */
+.drop-box {
+    background: #f5f5f5;
+    border: 1px dotted #1A91D7;
+    border-radius: 4px;
+}
+
+/*
+ * Styles the drag box during file dragging.
+ */
+.dragover {
+    border: 3px solid #1A91D7;
+}
+
+.sharp-edges {
+    border-radius: 0px;
+}
+
+/****************************/
+
+.number_circle {
+    font-family: gotham_bold;
+    font-size: 32px;
+    border-radius: 50%;
+    behavior: url(PIE.htc); /* remove if you don't care about IE8 */
+
+    width: 46px;
+    height: 46px;
+
+    background: rgba(255, 255, 255, 0);
+    border: 2px solid #1A91D7;
+    color: #1A91D7;
+    text-align: center;
+
+/*    font: 32px Arial, sans-serif;*/
+}

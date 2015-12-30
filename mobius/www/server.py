@@ -3,7 +3,6 @@ import argparse
 import base64
 import logging
 import os
-import traceback
 import uuid
 
 
@@ -19,7 +18,6 @@ from tornado.web import (
                          RequestHandler,
                          StaticFileHandler)
 
-from mobius.db import db
 from mobius.comm import stream
 from mobius.comm.msg_pb2 import Request, RESULT, ERROR, UPLOADING
 from mobius.comm.stream import SocketFactory
@@ -27,16 +25,10 @@ from mobius.service import Command, Parameter
 from mobius.utils import set_up_logging, JSONObject, eventloop
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
-from mobius.www.websocks import UploadProgressWS, ProviderUploadProgressWS
+from mobius.www.websocks import UploadProgressWS, ProviderUploadProgressWS, ProvidersService
 
 
 log = logging.getLogger(__name__)
-
-
-username = "vagrant"
-authentication = "tmp"
-dbname = "mydb"
-host = "localhost"
 
 
 class RequestError(Exception):
@@ -243,8 +235,7 @@ class MainHandler(BaseHandler):
     This handler is responsible for serving up the root page of the
     application.
     '''
-    def initialize(self, db_handle):
-        self._db_handle = db_handle
+    def initialize(self):
         self._user_id = None
 
     @authenticated
@@ -433,11 +424,6 @@ class MobiusApplication(Application):
     def __init__(self, loop):
         self._loop = loop
 
-        db_url = "postgresql://{usr}:{pswd}@{host}/{db}".format(usr=username,
-                                                                pswd=authentication,
-                                                                host=host,
-                                                                db=dbname)
-        self._db_handle = db.DBHandle(db_url, verbose=False)
         handlers = [
             # Static file handlers
             (r'/(favicon.ico)', StaticFileHandler, {"path": ""}),
@@ -448,11 +434,13 @@ class MobiusApplication(Application):
             (r'/quote', QuoteHandler, {"loop": self._loop}),
             (r'/provider_upload', UploadToProvider, {"loop": self._loop}),
 
+            # Web sockets
             (r'/ws/upload_progress', UploadProgressWS),
             (r'/ws/provider_upload_progress', ProviderUploadProgressWS),
+            (r'/ws/provider_request', ProvidersService),
 
             # Page handlers
-            (r"/", MainHandler, {"db_handle": self._db_handle}),
+            (r"/", MainHandler),
             (r"/auth/create", AuthCreateHandler, {"loop": self._loop}),
             (r"/auth/login", AuthLoginHandler, {"loop": self._loop}),
             (r"/auth/logout", AuthLogoutHandler, {"loop": self._loop}),
@@ -467,6 +455,13 @@ class MobiusApplication(Application):
         self._sessions = {}
         self._web_socks = {}
         super().__init__(handlers, **settings)
+
+    @property
+    def loop(self):
+        '''
+        Loop on which this app is running.
+        '''
+        return self._loop
 
     @property
     def sessions(self):

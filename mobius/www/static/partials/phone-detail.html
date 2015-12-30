@@ -15,11 +15,13 @@
   </li>
 </ul>
 
+<div ng-controller="TestControl">
+
 <ul class="specs">
   <li>
-    <span>Availability and Networks</span>
+    <a href ng-click="send_request()">Availability and Networks</a>
     <dl>
-      <dt>Availability</dt>
+      <dt>Availability {{ test_var }}</dt>
       <dd ng-repeat="availability in phone.availability">{{availability}}</dd>
     </dl>
   </li>
@@ -116,3 +118,5 @@
     <dd>{{phone.additionalFeatures}}</dd>
   </li>
 </ul>
+
+</div>
