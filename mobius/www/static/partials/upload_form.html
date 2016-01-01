@@ -1,0 +1,116 @@
+<div ng-controller='UploadFormCtrl'>
+  <form name="upload_form" novalidate>
+    <div class="row flex-row">
+      <!-- First box -->
+      <div class="well text-center col-md-3 col-centered">
+
+        <div class="number-circle center-block">1</div>
+        <br/>
+
+        <div class="T10">
+          Upload a File
+        </div>
+        <br/>
+
+        <div class="form-group"
+          ng-class="{ 'has-error': (upload_form.fileName.$touched && upload_form.fileName.$invalid) }">
+          <input type="text" name="fileName" ng-model="filename"
+            class="form-control T20 text-center"
+            ng-minlength="3"
+            ng-maxlength="40"
+            placeholder="Please enter the name of this file."
+            uib-tooltip="{{ filename_error }}"
+            tabindex="0"
+            tooltip-trigger="focus"
+            tooltip-is-open="show_filename_error"
+            ng-blur="validate_filename()"
+            required/>
+        </div>
+
+        <br/>
+        <div class="form-group"
+          ng-class="{ 'has-error': show_object_error }">
+          <div ngf-drop ngf-select ng-model="object_file"
+            name="objectFile"
+            class="drop-box form-control"
+            ngf-multiple="false"
+            ngf-allow-dir="false"
+            ngf-drag-over-class="dragover"
+            ng-change="validate_file()"
+            uib-tooltip="{{ object_file_error }}"
+            ng-mouseleave="validate_file()"
+            tooltip-trigger="none"
+            tooltip-is-open="show_object_error"
+            required>
+            Drag your STL file here or <b>browse</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- Second box -->
+      <div class="well text-center col-md-3 col-centered">
+        <div class="number-circle center-block">2</div>
+        <br/>
+
+        <div class="T10">
+          Select Material
+        </div>
+        <br/>
+
+        <div class="form-group">
+          <select class="form-control sharp-edges T19" id="material">
+            <option>Plastic</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <div class="btn-group">
+            <label class="btn btn-primary" ng-model="unit" uib-btn-radio="'mm'">&emsp;mm&emsp;</label>
+            <label class="btn btn-primary" ng-model="unit" uib-btn-radio="'in'">&emsp;in&emsp;</label>
+            <label class="btn btn-primary" ng-model="unit" uib-btn-radio="'cm'">&emsp;cm&emsp;</label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Third box -->
+      <div class="well text-center col-md-3 col-centered">
+        <div class="number-circle center-block">3</div>
+        <br/>
+
+        <div class="T10">
+          Get Quotes
+        </div>
+        <br/>
+        <br/>
+
+        <div ng-mouseenter="validate_filename()">
+          <button class="btn btn-primary T9"
+            ng-disabled="upload_form.$invalid || show_object_error"
+            ng-click="uploadFile(object_file)">
+            &emsp;Go&emsp;
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Modal definition -->
+      <script type="text/ng-template" id="upload_modal.html">
+        <div class="modal-header">
+          <h3 class="modal-title">Upload in Progress</h3>
+        </div>
+        <div class="modal-body">
+          <div ng-show="progress > 0" class="col-sm-12">
+            <uib-progressbar value="progress">
+              <span style="color:white; white-space:nowrap;">{{progress}}%</span>
+            </uib-progressbar>
+          </div>
+        </div>
+        <div class="modal-footer">
+        </div>
+      </script>
+
+    </div>
+  </form>
+  <div flash-message="3000"></div>
+</div>
