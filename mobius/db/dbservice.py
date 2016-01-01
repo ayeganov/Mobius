@@ -4,11 +4,10 @@ import os
 
 import zmq.eventloop
 
-from mobius.comm.msg_pb2 import MobiusModel, DBResponse
 from mobius.comm.stream import SocketFactory
 from mobius.db import db
 from mobius.service import AbstractCommand, AbstractFactory, BaseService, Command
-from mobius.utils import set_up_logging
+from mobius.utils import set_up_logging, JSONObject
 from mobius.utils import eventloop
 
 log = logging.getLogger(__name__)
@@ -68,7 +67,71 @@ class SaveFile(AbstractCommand):
                 os.remove(self._path)
             except OSError:
                 log.error("Unable to delete file: {0}".format(self._path))
-            return file_3d.id
+            result = JSONObject()
+            result.model_id = file_3d.id
+            return result.json_string
+
+
+class FindUser(AbstractCommand):
+    '''
+    This command finds the user information in the database, and returns it to
+    the requestor.
+    '''
+    def __init__(self, user_email, db_handle):
+        self._user_email = user_email
+        self._db_handle = db_handle
+
+    def initialize(self):
+        '''
+        Nothing to do here.
+        '''
+
+    def run(self):
+        '''
+        Retrieve the user by their email.
+        '''
+        with self._db_handle.session_scope() as session:
+            user = session.query(db.User)\
+                                 .filter_by(email=self._user_email)\
+                                 .one()
+            result = JSONObject()
+            result.id = user.id
+            result.email = user.email
+            result.password = user.password
+            result.date_created = str(user.date_created).split(" ", 1)[0]
+            return result.json_string
+
+
+class CreateUser(AbstractCommand):
+    '''
+    Creates a new user.
+    '''
+    def __init__(self, user_email, user_pass, db_handle):
+        self._user_email = user_email
+        self._user_pass = user_pass
+        self._db_handle = db_handle
+
+    def initialize(self):
+        '''
+        Nothing to do here.
+        '''
+
+    def run(self):
+        '''
+        Do the thing.
+        '''
+        with self._db_handle.session_scope() as session:
+            user = db.User(email=self._user_email,
+                           password=self._user_pass)
+
+            session.add(user)
+            session.commit()
+
+            json_user = JSONObject()
+            json_user.id = user.id
+            json_user.email = user.email
+            json_user.date_created = str(user.date_created).split(" ", 1)[0]
+            return json_user.json_string
 
 
 class DBCommandFactory(AbstractFactory):
@@ -81,6 +144,8 @@ class DBCommandFactory(AbstractFactory):
         '''
         self._commands = {
             Command.SAVE_FILE: self.make_save_command,
+            Command.FIND_USER: self.make_find_user_command,
+            Command.CREATE_USER: self.make_create_user_command
         }
 
     @property
@@ -92,7 +157,24 @@ class DBCommandFactory(AbstractFactory):
         Lets save provided file to the database.
         '''
         db_handle = context['db_handle']
-        return SaveFile(request.path, request.filename, request.user_id, db_handle)
+        params = JSONObject(request.params)
+        return SaveFile(params.path, params.filename, params.user_id, db_handle)
+
+    def make_find_user_command(self, envelope, request, context):
+        '''
+        Fetch the user from the db.
+        '''
+        db_handle = context['db_handle']
+        params = JSONObject(request.params)
+        return FindUser(params.email, db_handle)
+
+    def make_create_user_command(self, envelope, request, context):
+        '''
+        Create new user.
+        '''
+        db_handle = context['db_handle']
+        params = JSONObject(request.params)
+        return CreateUser(params.email, params.password, db_handle)
 
 
 class DBService(BaseService):
@@ -100,8 +182,8 @@ class DBService(BaseService):
     Database service responsible for CRUD operations on the database.
 
     Create channel:
-        /db/new_file: Expects a DBRequest to be received. Stores the file
-                      specified in the DB, and associates it with a proper user.
+        /db/request: Expects a DBRequest to be received. Stores the file
+                     specified in the DB, and associates it with a proper user.
     '''
     def __init__(self, url, executor, loop):
         '''
@@ -113,19 +195,19 @@ class DBService(BaseService):
         @param loop - zmq event loop
         '''
         self._db_handle = db.DBHandle(url)
-        self._new_file_rep = SocketFactory.router_socket("/db/new_file",
-                                                         on_recv=self.process_request,
-                                                         loop=loop)
+        self._db_request = SocketFactory.router_socket("/db/request",
+                                                       on_recv=self.process_request,
+                                                       loop=loop)
         self._db_factory = DBCommandFactory()
         super().__init__(executor, loop)
 
     @property
     def response_stream(self):
-        return self._new_file_rep
+        return self._db_request
 
     @property
     def receive_stream(self):
-        return self._new_file_rep
+        return self._db_request
 
     @property
     def name(self):
@@ -137,19 +219,6 @@ class DBService(BaseService):
 
     def handle_worker_state(self, msgs):
         pass
-
-    def respond_success(self, envelope, request, result):
-        log.debug("Responding successfully to {0} with {1}".format(request, result))
-        model = MobiusModel(id=result, user_id=request.user_id)
-        response = DBResponse(success=True, model=model)
-        self._new_file_rep.reply(envelope, response)
-    respond_success.__doc__ = BaseService.respond_success.__doc__
-
-    def respond_error(self, envelope, request, error):
-        log.debug("Responding with error to {0} with {1}".format(request, error))
-        response = DBResponse(success=False, error=str(error))
-        self._new_file_rep.reply(envelope, response)
-    respond_error.__doc__ = BaseService.respond_error.__doc__
 
     def get_service_context(self):
         '''

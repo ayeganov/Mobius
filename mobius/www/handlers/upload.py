@@ -4,12 +4,13 @@ import tempfile
 
 import tornado.gen
 from tornado.concurrent import Future
+from tornado import escape
 
 # Mobius
-from mobius.comm.msg_pb2 import DBRequest
+from mobius.comm.msg_pb2 import Request, RESULT, ERROR, UPLOADING
 from mobius.comm.stream import SocketFactory
 from mobius.service import Command
-from mobius.utils import get_tmp_dir
+from mobius.utils import get_tmp_dir, JSONObject
 from mobius.www.utils import PostContentHandler
 
 
@@ -35,7 +36,7 @@ class StreamHandler(PostContentHandler):
         '''
         super(StreamHandler, self).initialize()
         self._tmp_file = tempfile.NamedTemporaryFile(dir=get_tmp_dir(), delete=False)
-        self._upload_pub = SocketFactory.dealer_socket("/db/new_file",
+        self._upload_pub = SocketFactory.dealer_socket("/db/request",
                                                        bind=False,
                                                        on_recv=self._handle_response,
                                                        loop=loop)
@@ -44,8 +45,15 @@ class StreamHandler(PostContentHandler):
         self._user_file_name = None
         self._upload_future = None
         self._uploaded_model_id = None
-        self._user_id = self.get_secure_cookie("user_id")
-        self._web_sock = self.application.web_socks.get(self._user_id, None)
+
+    def get_current_user(self):
+        '''
+        Fetch current users information.
+        '''
+        user = escape.to_basestring(self.get_secure_cookie("mobius_user"))
+        if user is None:
+            return None
+        return JSONObject(user)
 
     def _handle_response(self, envelope, msgs):
         '''
@@ -94,6 +102,8 @@ class StreamHandler(PostContentHandler):
         '''
         if self._get_field_name(headers) == self.NAME_FIELD:
             self._user_file_name = data.decode(self.HEADER_ENCODING)
+        else:
+            log.info("Field name: {}".format(self._get_field_name(headers)))
 
     def _get_field_name(self, headers):
         '''
@@ -111,11 +121,7 @@ class StreamHandler(PostContentHandler):
         if self._cur_headers != headers:
             self._cur_headers = headers
 
-        if self._web_sock is not None:
-            self._web_sock.send_progress(self.progress)
-        else:
-            log.error("Erroneous state: Unable to retrieve upload progress WS")
-
+        print("WTF")
         # Process different content types differently
         if self._get_field_name(self._cur_headers) == self.FILE_FIELD:
             self._write_file_data(self._cur_headers, chunk)
@@ -126,21 +132,28 @@ class StreamHandler(PostContentHandler):
     @tornado.gen.coroutine
     def request_done(self):
         self._upload_future = Future()
-        upload_file = DBRequest(command=Command.SAVE_FILE,
-                                path=self._tmp_file.name,
-                                filename=self._user_file_name,
-                                user_id=int(self._user_id))
+
+        params = JSONObject()
+        params.path = self._tmp_file.name
+        params.filename = self._user_file_name
+        params.user_id = self.current_user.id
+
+        upload_file = Request(command=Command.SAVE_FILE, params=params.json_string)
         log.info("Sending upload file: {0}".format(str(upload_file)))
         self._upload_pub.send(upload_file)
         yield self._upload_future
 
         try:
-            result = self._upload_future.result()
-            if result.success:
+            response = self._upload_future.result()
+            state = response.state
+            if state.state_id == RESULT:
                 log.debug("Successfully uploaded file {}".format(self._user_file_name))
-                self._uploaded_model_id = result.model.id
-            else:
+                json_resp = JSONObject(state.response)
+                self._uploaded_model_id = json_resp.model_id
+            elif state.state_id == ERROR:
                 log.debug("Failed to upload file {}".format(self._user_file_name))
+            else:
+                log.error("Unexpected response received: {}".format(str(response)))
         except:
             log.error("Error while uploading file: {}".format(self._user_file_name))
 

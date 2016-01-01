@@ -38,7 +38,7 @@ message UploadProgress
     optional int32 progress = 1;
 }
 
-message ProviderProgress
+message Progress
 {
     optional int32 provider_id = 1;
     optional int32 progress = 2;
@@ -47,23 +47,28 @@ message ProviderProgress
 message DBRequest
 {
     optional int32 command = 1;
+
+    // Save file fields
     optional string path = 2;
     optional string filename = 3;
     optional int32 user_id = 4;
+
+    // Retrieve user info fields
+    optional string email = 5;
 }
 
 message DBResponse
 {
     optional bool success = 1;
     optional MobiusModel model = 2;
-    optional string error = 3;
+    optional string result = 3;
+    optional string error = 4;
 }
 
-message ProviderRequest
+message Request
 {
     optional int32 command = 1;
     optional string params = 2;
-    optional MobiusModel model = 3;
 }
 
 enum StateId
@@ -78,10 +83,9 @@ message WorkerState
     optional StateId state_id = 1;
     optional string response = 2;
     optional string error = 3;
-    optional int32 progress = 4;
 }
 
-message ProviderResponse
+message Response
 {
     optional string service_name = 1;
     optional WorkerState state = 2;

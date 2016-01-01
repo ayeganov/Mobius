@@ -22,7 +22,7 @@ from mobius.service import (
     ServiceError,
     UploadResponse,
     make_param_string)
-from mobius.utils import set_up_logging
+from mobius.utils import set_up_logging, JSONObject
 
 
 log = logging.getLogger(__name__)
@@ -51,18 +51,16 @@ class QuoteCommand(MobiusCommand):
     '''
     Issue a request to sculpteo service to get the price of the provided model.
     '''
-    def __init__(self, envelope, mobius_id, params):
+    def __init__(self, envelope, mobius_id, http_params):
         '''
         Initialize QuoteService instance.
 
-        @param mobius_id - mobius id of the file to quote
         @param params - json encoded string containing the parameters for this
                         command
         '''
         self._envelope = envelope
         self._mobius_id = mobius_id
-        log.debug("params {0}".format(params))
-        self._params = json.loads(params)
+        self._http_params = http_params
         self._db_url = "postgresql://{usr}:{pswd}@{host}/{db}".format(usr=username,
                                                                       pswd=authentication,
                                                                       host=host,
@@ -131,8 +129,8 @@ class QuoteCommand(MobiusCommand):
         @returns json response from Sculpteo
         '''
         provider_info = self._get_sculpteo_info()
-        self._params[Parameter.ID.name] = provider_info.remote_id
-        param_string = make_param_string(SCULPTEO_PARAM_MAP, self._params)
+        self._http_params[Parameter.ID.name] = provider_info.remote_id
+        param_string = make_param_string(SCULPTEO_PARAM_MAP, self._http_params)
         url_request = DESIGN_PRICE_URL + "?" + param_string
 
         log.debug("Quote request: {0}".format(url_request))
@@ -144,12 +142,14 @@ class QuoteCommand(MobiusCommand):
 
         body = response['body']
         price = body['price']
-        result = {"total_cost": price['total_cost_raw'],
-                  "currency": body['currency'],
-                  "has_tax": price['has_tax'],
-                  "scale": body['scale'],
-                  "material": body['material']}
-        return json.dumps(result)
+
+        result = JSONObject()
+        result.total_cost = price['total_cost_raw']
+        result.currency = body['currency']
+        result.has_tax = price['has_tax']
+        result.scale = body['scale']
+        result.material = body['material']
+        return result.json_string
 
     def _get_sculpteo_info(self):
         '''
@@ -179,8 +179,10 @@ class UploadCommand(MobiusCommand):
     def __init__(self, envelope, mobius_id, user_id):
         '''
         @param envelope - address of the command initiator
-        @param mobius_id - database id of the file to be uploaded to Sculpteo
-        @param user_id - id of the user owning the file
+        @param params - json encoded string containing the parameters for this
+                        command
+            @param mobius_id - database id of the file to be uploaded to Sculpteo
+            @param user_id - id of the user owning the file
         '''
         self._envelope = envelope
         self._mobius_id = mobius_id
@@ -220,10 +222,14 @@ class UploadCommand(MobiusCommand):
 
         @param monitor - MultipartEncoderMonitor observing the file upload process
         '''
-        progress = int(100 * monitor.bytes_read / monitor.encoder.len)
-        progress_msg = msg_pb2.WorkerState(state_id=msg_pb2.UPLOADING, progress=progress)
-#        log.info("Uploading: {}".format(str(progress_msg)))
-        self.send_async_data(progress_msg)
+        try:
+            progress = int(100 * monitor.bytes_read / monitor.encoder.len)
+            response = json.dumps({"progress": progress})
+            progress_msg = msg_pb2.WorkerState(state_id=msg_pb2.UPLOADING, response=response)
+    #        log.info("Uploading: {}".format(str(progress_msg)))
+            self.send_async_data(progress_msg)
+        except Exception as e:
+            log.exception("Bad stuff when reporting progress: {}".format(e))
 
     def _upload_file(self, mob_file):
         '''
@@ -240,21 +246,26 @@ class UploadCommand(MobiusCommand):
             dimy:   dimension of the axis-aligned bounding box along the Y dimension in model units
             dimz:   dimension of the axis-aligned bounding box along the Z dimension in model units
         '''
-        file_handle = io.BytesIO(mob_file.data)
+        try:
+            file_handle = io.BytesIO(mob_file.data)
 
-        headers = {"X-Requested-With": "XMLHttpRequest"}
-        params = {"name": mob_file.name,
-                  "designer": "bobik",
-                  "password": "password",
-                  "share": "0",
-                  "print_authorization": "0",
-                  "file": ("mobius_file.stl", file_handle)}
-        me = MultipartEncoder(fields=params)
-        mem = MultipartEncoderMonitor(me, callback=self._report_progress)
-        headers['Content-Type'] = mem.content_type
-        response = requests.post(url=UPLOAD_URL, data=mem, headers=headers)
+            headers = {"X-Requested-With": "XMLHttpRequest"}
+            params = {"name": mob_file.name,
+                      "designer": "bobik",
+                      "password": "password",
+                      "share": "0",
+                      "print_authorization": "0",
+                      "file": ("mobius_file.stl", file_handle)}
+            me = MultipartEncoder(fields=params)
+            mem = MultipartEncoderMonitor(me, callback=self._report_progress)
+            headers['Content-Type'] = mem.content_type
+            response = requests.post(url=UPLOAD_URL, data=mem, headers=headers, verify=False)
 
-        return response.json()
+            return response.json()
+        except Exception as e:
+            log.info("Bad stuff when uploading.")
+            log.exception(e)
+            return json.dumps("{}")
 
     def _save_provider_info(self, provider_json):
         '''
@@ -316,11 +327,13 @@ class SculpteoFactory(ProviderFactory):
     Sculpteo command factory that creates Sculpteo specific commands.
     '''
     def make_upload_command(self, envelope, request, context=None):
-        return UploadCommand(envelope, request.model.id, request.model.user_id)
+        params = JSONObject(request.params)
+        return UploadCommand(envelope, params.mobius_id, params.user_id)
     make_upload_command.__doc__ = ProviderFactory.make_upload_command.__doc__
 
     def make_quote_command(self, envelope, request, context=None):
-        return QuoteCommand(envelope, request.model.id, request.params)
+        params = JSONObject(request.params)
+        return QuoteCommand(envelope, params.mobius_id, params.http_params)
     make_quote_command.__doc__ = ProviderFactory.make_quote_command.__doc__
 
 
@@ -352,8 +365,8 @@ class Sculpteo(BaseService):
 
     def handle_worker_state(self, envelope, msgs):
         msg = msgs[-1]
-        response = msg_pb2.ProviderResponse(service_name=self.name,
-                                            state=msg)
+        response = msg_pb2.Response(service_name=self.name,
+                                    state=msg)
         self.response_stream.reply(envelope, response)
     handle_worker_state.__doc__ = BaseService.handle_worker_state.__doc__
 

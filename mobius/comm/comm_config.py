@@ -6,26 +6,26 @@ from mobius.utils import Singleton
 
 STREAM_MAP =\
     {
-        "/db/new_file": dict(
-            send_type=msg_pb2.DBRequest,
-            reply_type=msg_pb2.DBResponse
+        "/db/request": dict(
+            send_type=msg_pb2.Request,
+            reply_type=msg_pb2.Response
         ),
         "/mobius/upload_progress": dict(
-            send_type=msg_pb2.UploadProgress,
-            reply_type=msg_pb2.UploadProgress
+            send_type=msg_pb2.UInt32,
+            reply_type=msg_pb2.UInt32
         ),
         "/request/local": dict(
-            send_type=msg_pb2.ProviderRequest,
-            reply_type=msg_pb2.ProviderResponse
+            send_type=msg_pb2.Request,
+            reply_type=msg_pb2.Response
         ),
         "/request/request": dict(
-            send_type=msg_pb2.ProviderRequest,
+            send_type=msg_pb2.Request,
         ),
         "/request/do_work": dict(
-            send_type=msg_pb2.ProviderRequest,
+            send_type=msg_pb2.Request,
         ),
         "/request/result": dict(
-            send_type=msg_pb2.ProviderResponse,
+            send_type=msg_pb2.Response,
         ),
         "dynamic": {
             "/worker/state/(.+)": dict(

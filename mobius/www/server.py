@@ -1,73 +1,249 @@
 # Standard lib
 import argparse
 import base64
-import json
 import logging
 import os
-import traceback
 import uuid
 
 
 # 3rd party
-from zmq import eventloop
-from tornado.concurrent import Future
+import zmq.eventloop
+from tornado import escape
 from tornado import gen
+from tornado.concurrent import Future
 from tornado.httpserver import HTTPServer
-from tornado.web import (RequestHandler,
+from tornado.web import (
                          Application,
+                         authenticated,
+                         RequestHandler,
                          StaticFileHandler)
-import tornado.websocket
 
-from mobius.db import db
 from mobius.comm import stream
-from mobius.comm.msg_pb2 import ProviderRequest, MobiusModel, RESULT, ERROR, UPLOADING
+from mobius.comm.msg_pb2 import Request, RESULT, ERROR, UPLOADING
 from mobius.comm.stream import SocketFactory
 from mobius.service import Command, Parameter
-from mobius.utils import set_up_logging
+from mobius.utils import set_up_logging, JSONObject, eventloop
 from mobius.www.handlers import upload
 from mobius.www.utils import get_max_request_buffer
-from mobius.www.websocks import UploadProgressWS, ProviderUploadProgressWS
+from mobius.www.websocks import UploadProgressWS, ProviderUploadProgressWS, ProvidersService
 
 
 log = logging.getLogger(__name__)
 
 
-username = "vagrant"
-authentication = "tmp"
-dbname = "mydb"
-host = "localhost"
+class RequestError(Exception):
+    pass
 
 
-class MainHandler(RequestHandler):
+class BaseHandler(RequestHandler):
+    '''
+    Defines a way to retrieve user object.
+    '''
+    def get_current_user(self):
+        '''
+        Fetch current users information.
+        '''
+        user = escape.to_basestring(self.get_secure_cookie("mobius_user"))
+        if user is None:
+            return None
+        return JSONObject(user)
+
+
+@gen.coroutine
+def make_request(message, socket):
+    '''
+    Helper method to make async service requests.
+
+    @param message - message to be sent to service
+    @param socket - socket to send it on
+    @returns service response message
+    '''
+    future = Future()
+
+    # set result callback
+    socket.on_recv(lambda _, msgs: future.set_result(msgs[-1]))
+    socket.send(message)
+    yield future
+
+    # clear result callback
+    socket.on_recv(None)
+    return future.result()
+
+
+@gen.coroutine
+def hash_password(password, salt, loop):
+    '''
+    Make a request to hashing service to hash provided password.
+
+    @param password - password to be hashed
+    @param salt - password salt as required by bcrypt
+    @param loop - event loop
+    @returns hashed password
+    '''
+    return password
+    hash_req = SocketFactory.dealer_socket("/login/request/hash",
+                                           bind=False,
+                                           loop=loop)
+    params = JSONObject()
+    params.password = password
+    params.salt = salt
+    login_request = Request(command=Command.HASH.value, params=params.json_string)
+    login_response = yield make_request(login_request, hash_req)
+
+    state = login_response.state
+    if state.state_id == RESULT:
+        return JSONObject(state.response)
+    else:
+        return None
+
+
+@gen.coroutine
+def load_user(email, loop):
+    '''
+    Issues a DB request for user information.
+
+    @param email - email supplied by the user at login page.
+    @returns user json object
+    '''
+    log.info("loading user: {}".format(email))
+    user_req = SocketFactory.dealer_socket("/db/request",
+                                           bind=False,
+                                           loop=loop)
+
+    params = JSONObject()
+    params.email = email
+    db_request = Request(command=Command.FIND_USER.value, params=params.json_string)
+    db_response = yield make_request(db_request, user_req)
+    state = db_response.state
+    if state.state_id == RESULT:
+        return JSONObject(state.response)
+    else:
+        return None
+
+
+@gen.coroutine
+def create_user(email, password, loop):
+    '''
+    Command to create a new user in mobius DB.
+
+    @param email - user email
+    @param user - user password
+    @param loop - zmq event loop
+    '''
+    user_req = SocketFactory.dealer_socket("/db/request",
+                                           bind=False,
+                                           loop=loop)
+
+    params = JSONObject()
+    params.email = email
+    params.password = password
+    db_request = Request(command=Command.CREATE_USER.value, params=params.json_string)
+    db_response = yield make_request(db_request, user_req)
+    state = db_response.state
+    if state.state_id == RESULT:
+        return JSONObject(state.response)
+    else:
+        return None
+
+
+class AuthCreateHandler(BaseHandler):
+    '''
+    Sign up page.
+    '''
+    def initialize(self, loop):
+        self._loop = loop
+
+    def get(self):
+        self.render("login.html", error=None, next_page=self.get_argument('next', '/'))
+
+    @gen.coroutine
+    def post(self):
+        '''
+        Create new user.
+        '''
+        email = escape.to_basestring(self.get_argument('email'))
+        password = escape.to_basestring(self.get_argument('password'))
+        log.info("Creating new user: {} - {}".format(email, password))
+        hashed_password = yield hash_password(password, salt=None, loop=self._loop)
+
+        try:
+            new_user = yield create_user(email, hashed_password, loop=self._loop)
+            if new_user is None:
+                raise RequestError("Failed to create user. User possibly already exists.")
+
+            if "password" in new_user:
+                del new_user.password
+            self.set_secure_cookie("mobius_user", new_user.json_string)
+            self.redirect(self.get_argument("next_page", "/"))
+        except RequestError as req_err:
+            self.render("login.html", error=str(req_err))
+
+
+class AuthLoginHandler(BaseHandler):
+    '''
+    All login related activity should be done in this handler.
+    '''
+    def initialize(self, loop):
+        self._loop = loop
+
+    def get(self):
+        if self.current_user is None:
+            self.render("login.html", error=None, next_page=self.get_argument('next', '/'))
+        else:
+            self.redirect("/")
+
+    @gen.coroutine
+    def post(self):
+        email = escape.to_basestring(self.get_argument('email'))
+        password = escape.to_basestring(self.get_argument('password'))
+
+        user = yield load_user(email, self._loop)
+
+        if user is None:
+            self.render('login.html',
+                        error="Incorrect Credentials",
+                        next_page=self.get_argument('next_page', '/'))
+            return
+
+        hashed_password = yield hash_password(password, salt=user.password, loop=self._loop)
+        if hashed_password == user.password:
+            # don't forget to delete the password from the cookie
+            del user.password
+            self.set_secure_cookie("mobius_user", user.json_string)
+            self.redirect(self.get_argument('next_page', '/'))
+        else:
+            self.render("login.html", error="Incorrect Credentials")
+
+
+class AuthLogoutHandler(BaseHandler):
+    '''
+    All logout activity should be done in this handler.
+    '''
+    def initialize(self, loop):
+        self._loop = loop
+
+    def get(self):
+        self.render("logout.html", user=self.current_user)
+
+    def post(self):
+        self.clear_cookie("mobius_user")
+        self.redirect("/")
+
+
+class MainHandler(BaseHandler):
     '''
     This handler is responsible for serving up the root page of the
     application.
     '''
-    def initialize(self, db_handle):
-        self._db_handle = db_handle
+    def initialize(self):
         self._user_id = None
 
+    @authenticated
     def get(self):
-        user_id = self.get_secure_cookie("user_id")
-        if user_id:
-            log.info("Welcome user: {0}".format(user_id))
-        else:
-            with self._db_handle.session_scope() as session:
-                user = session.query(db.User).filter_by(id=self._user_id).first()
-                if user is None:
-                    user = db.User(first_name="First", last_name="Last", password="foo")
-                    session.add(user)
-                    session.commit()
-
-                    self.set_secure_cookie("user_id", str(user.id))
-                    self._user_id = user.id
-                    log.info("Saved user")
-                else:
-                    log.info("Welcome user {0}".format(self._user_id))
-        self.render("index.html")
+        self.render("index.html", user=self.current_user)
 
 
-class QuoteHandler(RequestHandler):
+class QuoteHandler(BaseHandler):
     '''
     Remove me.
     '''
@@ -84,22 +260,24 @@ class QuoteHandler(RequestHandler):
         response = msgs[-1]
         self._request_future.set_result(response)
 
+    @authenticated
     @gen.coroutine
     def get(self):
         log.info("Test handler get")
         self._request_future = Future()
-        model_id = int(self.get_argument("mobius_id", default=1))
+        mobius_id = int(self.get_argument("mobius_id", default=1))
 
-        user_id = int(self.get_secure_cookie("user_id"))
-        mob_model = MobiusModel(id=model_id, user_id=user_id)
-        params = json.dumps({Parameter.QUANTITY.name: 1,
-                            Parameter.SCALE.name: 0.1,
-                            Parameter.UNIT.name: "cm"})
-#                            Parameter.MATERIAL.name: "metal_cast_silver_sanded"})
+        user_id = self.current_user.id
+        params = JSONObject()
+        params.mobius_id = mobius_id
+        params.user_id = user_id
+        params.http_params = {Parameter.QUANTITY.name: 1,
+                              Parameter.SCALE.name: 0.1,
+                              Parameter.UNIT.name: "cm"}
+#                              Parameter.MATERIAL.name: "metal_cast_silver_sanded"}
 
-        request = ProviderRequest(command=Command.QUOTE.value,
-                                  params=params,
-                                  model=mob_model)
+        request = Request(command=Command.QUOTE.value,
+                          params=params.json_string)
         self._request_dealer.send(request)
 
         log.info("Lets wait here one second.")
@@ -120,7 +298,7 @@ class QuoteHandler(RequestHandler):
         self._request_future = None
 
 
-class UploadToProvider(RequestHandler):
+class UploadToProvider(BaseHandler):
     '''
     Upload the file associated with the given mobius id to all providers.
     '''
@@ -141,12 +319,14 @@ class UploadToProvider(RequestHandler):
     def get(self):
         log.info("UploadToProvider handler get")
         self._request_future = Future()
-        model_id = int(self.get_argument("mobius_id", default=0))
+        mobius_id = int(self.get_argument("mobius_id", default=0))
+        user_id = self.current_user.id
 
-        user_id = int(self.get_secure_cookie("user_id"))
-        mob_model = MobiusModel(id=model_id, user_id=user_id)
-        request = ProviderRequest(command=Command.UPLOAD.value,
-                                  model=mob_model)
+        params = JSONObject()
+        params.mobius_id = mobius_id
+        params.user_id = user_id
+        request = Request(command=Command.UPLOAD.value,
+                          params=params.json_string)
         self._request_dealer.send(request)
 
         log.info("Lets wait here one second.")
@@ -156,7 +336,8 @@ class UploadToProvider(RequestHandler):
         response = self._request_future.result()
         state = response.state
         while state.state_id == UPLOADING:
-            log.info("Progress: {}".format(state.progress))
+            result = JSONObject(state.response)
+            log.info("Progress: {}".format(result.progress))
             self._request_future = Future()
             yield self._request_future
             response = self._request_future.result()
@@ -174,50 +355,143 @@ class UploadToProvider(RequestHandler):
         self._request_future = None
 
 
-class TestWebSocket(tornado.websocket.WebSocketHandler):
+class Session:
+    """
+    A user's session with a system.
+    This utility class contains no functionality, but is used to
+    represent a session.
+    @ivar uid: A unique identifier for the session, C{bytes}.
+    @ivar _reactor: An object providing L{IReactorTime} to use for scheduling
+        expiration.
+    @ivar sessionTimeout: timeout of a session, in seconds.
+    """
+    sessionTimeout = 900
+
+    _expireCall = None
+
+    def __init__(self, app, uid, loop=None):
+        """
+        Initialize a session with a unique ID for that session.
+        """
+        self._loop = zmq.eventloop.IOLoop.instance() if loop is None else loop
+
+        self.app = app
+        self.uid = uid
+        self.expireCallbacks = []
+        self.touch()
+        self.sessionNamespaces = {}
+
+    def startCheckingExpiration(self):
+        """
+        Start expiration tracking.
+        @return: C{None}
+        """
+        self._expireCall = self._reactor.callLater(
+            self.sessionTimeout, self.expire)
+
+    def notifyOnExpire(self, callback):
+        """
+        Call this callback when the session expires or logs out.
+        """
+        self.expireCallbacks.append(callback)
+
+    def expire(self):
+        """
+        Expire/logout of the session.
+        """
+        del self.site.sessions[self.uid]
+        for c in self.expireCallbacks:
+            c()
+        self.expireCallbacks = []
+        if self._expireCall and self._expireCall.active():
+            self._expireCall.cancel()
+            # Break reference cycle.
+            self._expireCall = None
+
+    def touch(self):
+        """
+        Notify session modification.
+        """
+        self.lastModified = self._reactor.seconds()
+        if self._expireCall is not None:
+            self._expireCall.reset(self.sessionTimeout)
+
+
+class MobiusApplication(Application):
     '''
-    First web socket to flesh out the initial design thoughts.
+    Mobius application that defines all request handlers.
     '''
-    def on_open(self):
-        '''
-        New web socket opened - self will be a new instance of TestWebSocket
-        connected to its own client.
-        '''
-        log.info("New websocket connected: {0}".format(self))
+    def __init__(self, loop):
+        self._loop = loop
 
-        self.write_message("You are connected.")
+        handlers = [
+            # Static file handlers
+            (r'/(favicon.ico)', StaticFileHandler, {"path": ""}),
 
-    def on_message(self, message):
-        '''
-        This socket received a message.
-        '''
-        log.info("Got a message: {0}".format(message))
-        loop = eventloop.IOLoop.instance()
-        loop.call_later(1, lambda: self.write_message("hello"))
+            # File upload handler
+            (r'/upload', upload.StreamHandler, {"loop": self._loop}),
 
-    def on_close(self):
-        log.info("Web socket closing...")
+            (r'/quote', QuoteHandler, {"loop": self._loop}),
+            (r'/provider_upload', UploadToProvider, {"loop": self._loop}),
+
+            # Web sockets
+            (r'/ws/upload_progress', UploadProgressWS),
+            (r'/ws/provider_upload_progress', ProviderUploadProgressWS),
+            (r'/ws/provider_request', ProvidersService),
+
+            # Page handlers
+            (r"/", MainHandler),
+            (r"/auth/create", AuthCreateHandler, {"loop": self._loop}),
+            (r"/auth/login", AuthLoginHandler, {"loop": self._loop}),
+            (r"/auth/logout", AuthLogoutHandler, {"loop": self._loop}),
+        ]
+        settings = dict(
+            template_path=os.path.join(os.path.dirname(__file__), "templates"),
+            static_path=os.path.join(os.path.dirname(__file__), "static"),
+            cookie_secret=base64.encodebytes(uuid.uuid4().bytes + uuid.uuid4().bytes),
+            login_url="/auth/login",
+            debug=True,
+        )
+        self._sessions = {}
+        self._web_socks = {}
+        super().__init__(handlers, **settings)
+
+    @property
+    def loop(self):
+        '''
+        Loop on which this app is running.
+        '''
+        return self._loop
+
+    @property
+    def sessions(self):
+        '''
+        Get all user sessions associated with this application.
+        '''
+        return self._sessions
+
+
+def port_type(value):
+    '''
+    Checks the value of the provided port is within the allowed range.
+    '''
+    try:
+        ivalue = int(value)
+        if 1 <= ivalue <= 1023:
+            if os.getuid():
+                raise argparse.ArgumentTypeError("You must have root privileges to use port {0}"
+                                                 .format(value))
+        elif ivalue <= 0 or ivalue > 65535:
+            raise ValueError()
+        return ivalue
+    except ValueError:
+        raise argparse.ArgumentTypeError("Port value {0} is invalid.".format(value))
 
 
 def main():
     '''
     Main routine, what more do you want?
     '''
-    def port_type(value):
-        '''
-        Checks the value of the provided port is within the allowed range.
-        '''
-        try:
-            ivalue = int(value)
-            if 1 <= ivalue <= 1023:
-                if os.getuid():
-                    raise argparse.ArgumentTypeError("You must have root privileges to use port {0}"
-                                                     .format(value))
-            elif ivalue <= 0 or ivalue > 65535:
-                raise ValueError()
-            return ivalue
-        except ValueError:
-            raise argparse.ArgumentTypeError("Port value {0} is invalid.".format(value))
 
     try:
         parser = argparse.ArgumentParser(prog="Server", description="Tornado Server Instanc")
@@ -234,54 +508,25 @@ def main():
         args = parser.parse_args()
 
         set_up_logging(logging.DEBUG if args.verbose else logging.INFO)
-        loop = eventloop.IOLoop.instance()
+        loop = zmq.eventloop.IOLoop.instance()
         local_proxy = stream.LocalRequestProxy(front_end_name="/request/local",
                                                back_end_name="/request/request",
                                                loop=loop)
-
-        settings = {
-            "cookie_secret": base64.encodebytes(uuid.uuid4().bytes + uuid.uuid4().bytes)
-        }
-
-        db_url = "postgresql://{usr}:{pswd}@{host}/{db}".format(usr=username,
-                                                                pswd=authentication,
-                                                                host=host,
-                                                                db=dbname)
-        db_handle = db.DBHandle(db_url, verbose=True)
-        app = Application(
-            [
-                # Static file handlers
-                (r'/(favicon.ico)', StaticFileHandler, {"path": ""}),
-
-                # File upload handler
-                (r'/upload', upload.StreamHandler, {"loop": loop}),
-
-                (r'/quote', QuoteHandler, {"loop": loop}),
-                (r'/provider_upload', UploadToProvider, {"loop": loop}),
-
-                (r'/ws/upload_progress', UploadProgressWS),
-                (r'/ws/provider_upload_progress', ProviderUploadProgressWS),
-
-                # Page handlers
-                (r"/", MainHandler, {"db_handle": db_handle}),
-            ],
-            template_path=os.path.join(os.path.dirname(__file__), "templates"),
-            static_path=os.path.join(os.path.dirname(__file__), "static"),
-            debug=True,
-            **settings
-        )
-        app.loop = loop
-        app.web_socks = {}
-
+        app = MobiusApplication(loop=loop)
         server = HTTPServer(app, max_body_size=get_max_request_buffer())
 
-        server.listen(args.port)
-        print("Started mobius server.")
-        loop.start()
+        @eventloop
+        def start_loop(loop):
+            log.info("Mobius server running on port {} started.".format(args.port))
+            server.listen(args.port)
+            loop.start()
+
+        start_loop(loop)
+
     except (SystemExit, KeyboardInterrupt):
         print("Exiting due to interrupt...")
-    except Exception:
-        traceback.print_exc()
+    except Exception as e:
+        log.exception(e)
 
 
 if __name__ == "__main__":

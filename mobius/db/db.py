@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 import enum
 
-import sqlalchemy
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy import Sequence
@@ -25,17 +24,18 @@ class ProviderID(enum.IntEnum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("email", name="unique_email"),)
+
     id = Column(Integer, Sequence('user_id_seq'), primary_key=True)
-    first_name = Column(String)
-    last_name = Column(String)
+    email = Column(String)
     password = Column(String)
     date_created = Column(DateTime, default=func.now(), onupdate=func.current_timestamp())
 
     transactions = relationship("Transaction")
 
     def __repr__(self):
-        return "<User(fullname='{0} {1}', password='{2}', created='{3}')>".format(
-               self.first_name, self.last_name, self.password, self.date_created)
+        return "<User(email='{0}', password='{1}', created='{2}')>".format(
+               self.email, self.password, self.date_created)
 
 
 class File(Base):
