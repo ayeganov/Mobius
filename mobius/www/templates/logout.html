@@ -1,0 +1,11 @@
+<html>
+    <head>
+        <title>Please Log Out</title>
+    </head>
+<body>
+    <form action="/auth/logout" method="POST">
+        <p> Please logout {{ user.email }} </p>
+        <input type="submit" value="Log Out" />
+    </form>
+</body>
+</html>
