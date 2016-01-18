@@ -22,6 +22,7 @@ from mobius.service import (
     ServiceError,
     UploadResponse,
     make_param_string)
+from mobius.utils import eventloop
 from mobius.utils import set_up_logging, JSONObject
 
 
@@ -383,15 +384,16 @@ class IMaterialise(BaseService):
 
 
 def main():
-    try:
-        set_up_logging()
-        loop = IOLoop.instance()
-        with mp.Pool(NUM_WORKERS) as executor:
-            service = IMaterialise(executor, loop)
-            log.info("i.materialise service started.")
-            service.start()
-    except (SystemExit, KeyboardInterrupt):
-        print("Exiting due to system interrupt...")
+    set_up_logging()
+
+    @eventloop
+    def start_imaterialise():
+        log.info("i.materialise service started.")
+
+    loop = IOLoop.instance()
+    with mp.Pool(NUM_WORKERS) as executor:
+        service = IMaterialise(executor, loop)
+        service.start()
 
 
 if __name__ == "__main__":
