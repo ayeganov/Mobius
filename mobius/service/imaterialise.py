@@ -28,8 +28,9 @@ from mobius.utils import set_up_logging, JSONObject
 log = logging.getLogger(__name__)
 
 
-DESIGN_PRICE_URL = "http://www.sculpteo.com/en/api/design/3D/price_by_uuid/"
-UPLOAD_URL = "https://www.sculpteo.com/en/upload_design/a/3D/"
+PRICE_URL = "https://imatsandbox.materialise.net/web-api/pricing/model"
+UPLOAD_URL = "https://imatsandbox.materialise.net/web-api/tool/{tool_id}/model"
+TOOL_ID = "d192ffb1-c4d1-4c3a-b25f-71cfd1bb2c17"
 
 NUM_WORKERS = 5
 username = "vagrant"
@@ -38,7 +39,7 @@ dbname = "mydb"
 host = "localhost"
 
 
-SCULPTEO_PARAM_MAP = {
+MATERIALISE_PARAM_MAP = {
     Parameter.ID.name: "uuid",
     Parameter.QUANTITY.name: "quantity",
     Parameter.SCALE.name: "scale",
@@ -49,7 +50,7 @@ SCULPTEO_PARAM_MAP = {
 
 class QuoteCommand(MobiusCommand):
     '''
-    Issue a request to sculpteo service to get the price of the provided model.
+    Issue a request to i.materialise service to get the price of the provided model.
     '''
     def __init__(self, envelope, mobius_id, http_params):
         '''
@@ -174,7 +175,7 @@ class QuoteCommand(MobiusCommand):
 class UploadCommand(MobiusCommand):
     '''
     Retrieves the file data from the database associated with the provided
-    mobius file id then uploads this file to Sculpteo.
+    mobius file id then uploads this file to i.materialise.
     '''
     def __init__(self, envelope, mobius_id, user_id):
         '''
@@ -201,12 +202,12 @@ class UploadCommand(MobiusCommand):
         '''
         Create a connection to the database within the new process space.
         '''
-        super().initialize("Sculpteo")
+        super().initialize("i.materialise")
         self._db = db.DBHandle(self._db_url)
 
     def _get_provider_info(self, mob_file):
         '''
-        Fetch Sculpteo provider info object.
+        Fetch i.materialise provider info object.
 
         @param mob_file - database handle to the file contents
         @returns Sculpteo provider info if it exists, None otherwise
@@ -255,7 +256,7 @@ class UploadCommand(MobiusCommand):
                       "password": "password",
                       "share": "0",
                       "print_authorization": "0",
-                      "file": ("mobius_file.stl", file_handle)}
+                      "file": ("mobius_file.stl", file_handle, "application/octet-stream")}
             me = MultipartEncoder(fields=params)
             mem = MultipartEncoderMonitor(me, callback=self._report_progress)
             headers['Content-Type'] = mem.content_type
@@ -337,13 +338,13 @@ class SculpteoFactory(ProviderFactory):
     make_quote_command.__doc__ = ProviderFactory.make_quote_command.__doc__
 
 
-class Sculpteo(BaseService):
+class IMaterialise(BaseService):
     '''
-    This service implements the details of communicating with the Sculpteo.com.
+    This service implements the details of communicating with the i.materialise.com.
     '''
     def __init__(self, executor, loop):
         '''
-        Initialize instance of Sculpteo service
+        Initialize instance of i.materialise service
         '''
         self._work_sub = SocketFactory.sub_socket("/request/do_work",
                                                   on_recv=self.process_request,
@@ -352,7 +353,7 @@ class Sculpteo(BaseService):
                                                      bind=False,
                                                      loop=loop)
         self._factory = SculpteoFactory()
-        super(Sculpteo, self).__init__(executor, loop)
+        super(IMaterialise, self).__init__(executor, loop)
 
     @property
     def receive_stream(self):
@@ -374,7 +375,7 @@ class Sculpteo(BaseService):
 
     @property
     def name(self):
-        return "Sculpteo"
+        return "i.materialise"
 
     @property
     def cmd_factory(self):
@@ -386,8 +387,8 @@ def main():
         set_up_logging()
         loop = IOLoop.instance()
         with mp.Pool(NUM_WORKERS) as executor:
-            service = Sculpteo(executor, loop)
-            log.info("Sculpteo service started.")
+            service = IMaterialise(executor, loop)
+            log.info("i.materialise service started.")
             service.start()
     except (SystemExit, KeyboardInterrupt):
         print("Exiting due to system interrupt...")

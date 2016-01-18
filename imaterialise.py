@@ -18,11 +18,10 @@ import logging
 PRICE_URL = "https://imatsandbox.materialise.net/web-api/pricing/model"
 UPLOAD_URL = "https://imatsandbox.materialise.net/web-api/tool/{tool_id}/model"
 
-API_CODE = "c37a867e-1f80-4873-8049-8b1b33b4a171"
-TOOL_ID = "3694d823-dfbc-4542-a609-04abb7234635"
+API_CODE = "56833f15-b35e-4c96-af32-33deafa8f0b1"
+TOOL_ID = "d192ffb1-c4d1-4c3a-b25f-71cfd1bb2c17"
 
-STL_FILE = "/tmp/3dobject.bin"
-#STL_FILE = "tiny.stl"
+STL_FILE = "demo_obj.stl"
 
 
 price_message = {
@@ -94,7 +93,7 @@ def progress(monitor):
     print("Bytes read: {}%".format(so_far))
 
 
-UPLOAD_URL = "https://www.sculpteo.com/en/upload_design/a/3D/"
+#UPLOAD_URL = "https://www.sculpteo.com/en/upload_design/a/3D/"
 def sculpteo_upload():
     with open(STL_FILE, "rb") as stl_file:
         headers = {"X-Requested-With": "XMLHttpRequest"}
@@ -103,12 +102,14 @@ def sculpteo_upload():
                   "password": "password",
                   "share": "0",
                   "print_authorization": "0",
-                  "file": ("mobius_file.stl", stl_file)}
+                  "file": ("mobius_file.stl", stl_file, "application/octet-stream")}
         me = MultipartEncoder(fields=params)
         m = MultipartEncoderMonitor(me, callback=progress)
         print("Content type: {}, length: {}".format(m.content_type, me.len))
         headers['Content-Type'] = m.content_type
-        response = requests.post(url=UPLOAD_URL, data=m, headers=headers)
+        upload_url = UPLOAD_URL.format(tool_id=TOOL_ID)
+        response = requests.post(url=upload_url, data=m, headers=headers)
+        print(m.to_string())
         print("Bullshit time is {} seconds".format(time.time() - after_100))
         print(response.text)
 
@@ -127,7 +128,8 @@ def sculpteo_upload_orig():
                   "password": "password",
                   "share": 0,
                   "print_authorization": 0}
-        response = requests.post(url=UPLOAD_URL, files=files, data=params, headers=headers, stream=True)
+        upload_url = UPLOAD_URL.format(tool_id=TOOL_ID)
+        response = requests.post(url=upload_url, files=files, data=params, headers=headers, stream=True)
         print(response.text)
     print("Upload took {} seconds.".format(time.time() - start))
 
